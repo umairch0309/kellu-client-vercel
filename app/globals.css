@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #2B50AA;
+  --secondary: #28AFB0;
+  --tertiary: #B084CC;
+  --neutral-dark: #1F271B;
+  --neutral-light: #EAEBED;
+}
+
+body {
+  color: var(--neutral-dark);
+  background: white; /* Main Background 1st layer - White */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Touch-friendly tap targets */
+button, a {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (min-width: 768px) {
+  button, a {
+    min-height: auto;
+    min-width: auto;
+  }
+}
+
