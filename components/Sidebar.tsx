@@ -78,9 +78,9 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
             <Image 
               src="/logo.png" 
               alt="Kellu" 
-              width={100} 
-              height={28}
-              className="h-7 w-auto max-w-full"
+              width={72} 
+              height={20}
+              className="h-5 w-auto max-w-full"
               priority
             />
           </Link>
@@ -99,9 +99,9 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
               <Image 
                 src="/logo.png" 
                 alt="Kellu" 
-                width={120} 
-                height={32}
-                className="h-8 w-auto max-w-full"
+                width={80} 
+                height={22}
+                className="h-[22px] w-auto max-w-full"
                 priority
               />
             </Link>
@@ -113,9 +113,9 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
               <Image 
                 src="/logo.png" 
                 alt="Kellu" 
-                width={32} 
-                height={32}
-                className="h-7 w-7 object-contain"
+                width={24} 
+                height={24}
+                className="h-6 w-6 object-contain"
                 priority
               />
             </Link>
@@ -153,7 +153,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
                     title={collapsed ? item.label : ''}
                   >
                     <Icon size={16} className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-neutral-dark'} ${isActive ? '' : 'group-hover:text-neutral-dark'}`} />
-                    {!collapsed && <span className={`text-xs truncate ${isActive ? 'text-white' : 'text-neutral-dark'}`}>{item.label}</span>}
+                    {!collapsed && <span className={`text-sm truncate ${isActive ? 'text-white' : 'text-neutral-dark'}`}>{item.label}</span>}
                     {!collapsed && item.hasDropdown && (
                       <FiChevronDown size={14} className={`ml-auto flex-shrink-0 ${isActive ? 'text-white/60' : 'text-neutral-dark/60'}`} />
                     )}
@@ -176,7 +176,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <FiChevronLeft size={16} className={`flex-shrink-0 ${collapsed ? 'rotate-180' : ''}`} />
-            {!collapsed && <span className="text-xs">Collapse</span>}
+            {!collapsed && <span className="text-sm">Collapse</span>}
           </button>
         </div>
       </aside>

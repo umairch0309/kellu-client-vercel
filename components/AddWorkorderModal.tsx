@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { FiX, FiChevronDown, FiPlus, FiHelpCircle, FiCheckCircle } from 'react-icons/fi'
+import { FiX, FiChevronDown, FiPlus, FiCheckCircle } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { mockClients, mockTeamMembers } from '@/data/mockData'
+import AddClientModal from './AddClientModal'
 
 interface AddWorkorderModalProps {
   isOpen: boolean
@@ -19,7 +20,6 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
-  const [showAvailability, setShowAvailability] = useState(true)
   const [anytime, setAnytime] = useState(false)
   const typeDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -50,6 +50,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
     lineItems: [] as Array<{ name: string; quantity: number; unitPrice: number }>,
   })
   const [showLineItems, setShowLineItems] = useState(false)
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false)
 
   // Update form data when initialDate, initialTime, or initialClientId changes
   useEffect(() => {
@@ -221,18 +222,37 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-2.5">
           <form onSubmit={handleSubmit} className="space-y-2.5">
-            {/* Client */}
-            <div>
+            {/* Client / Address - search or create */}
+            <div className="space-y-1.5">
               <input
                 type="text"
                 name="client"
                 value={formData.client}
                 onChange={handleChange}
-                placeholder="Client"
-                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                placeholder="Search client or address"
+                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                style={{ borderColor: '#EAEBED' }}
               />
+              <button
+                type="button"
+                onClick={() => setIsAddClientOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 border rounded text-sm font-medium transition-colors"
+                style={{
+                  borderColor: '#EAEBED',
+                  backgroundColor: 'white',
+                  color: '#28AFB0',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                <FiPlus size={14} />
+                <span>Create client or address</span>
+              </button>
             </div>
-
             {/* Address */}
             <div>
               <input
@@ -241,7 +261,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="Address"
-                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
               />
             </div>
 
@@ -253,7 +273,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="Title"
-                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
               />
             </div>
 
@@ -262,7 +282,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               <button
                 type="button"
                 onClick={() => setShowInstructions(true)}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary-dark transition-colors"
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
               >
                 <FiPlus size={12} />
                 <span>Add Instructions</span>
@@ -275,7 +295,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                   onChange={handleChange}
                   placeholder="Add instructions..."
                   rows={2}
-                  className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs resize-none"
+                  className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm resize-none"
                 />
               </div>
             )}
@@ -285,7 +305,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               <button
                 type="button"
                 onClick={() => setShowAssign(true)}
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary-dark transition-colors"
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
               >
                 <FiPlus size={12} />
                 <span>Assign</span>
@@ -302,7 +322,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                     onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value as 'team' | 'owner' })}
                     className="w-3 h-3 text-primary"
                   />
-                  <label htmlFor="assign-team" className="text-xs text-neutral-dark cursor-pointer">Team members</label>
+                  <label htmlFor="assign-team" className="text-sm text-neutral-dark cursor-pointer">Team members</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -314,14 +334,14 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                     onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value as 'team' | 'owner' })}
                     className="w-3 h-3 text-primary"
                   />
-                  <label htmlFor="assign-owner" className="text-xs text-neutral-dark cursor-pointer">The business owner themselves</label>
+                  <label htmlFor="assign-owner" className="text-sm text-neutral-dark cursor-pointer">The business owner themselves</label>
                 </div>
                 {formData.assignedTo === 'team' && (
                   <select
                     name="assignedTeamMember"
                     value={formData.assignedTeamMember}
                     onChange={(e) => setFormData({ ...formData, assignedTeamMember: e.target.value })}
-                    className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs mt-1"
+                    className="w-full px-2 py-1.5 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm mt-1"
                   >
                     <option value="">Select team member</option>
                     {mockTeamMembers.map((member) => (
@@ -341,7 +361,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                   <button
                     type="button"
                     onClick={() => setShowLineItems(true)}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary-dark transition-colors"
+                    className="flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors"
                   >
                     <FiPlus size={12} />
                     <span>Line items</span>
@@ -349,13 +369,13 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 ) : (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-neutral-dark">Line items</span>
+                      <span className="text-sm font-medium text-neutral-dark">Line items</span>
                       <button
                         type="button"
                         onClick={() => {
                           setFormData({ ...formData, lineItems: [...formData.lineItems, { name: '', quantity: 1, unitPrice: 0 }] })
                         }}
-                        className="text-xs text-primary hover:text-primary-dark"
+                        className="text-sm text-primary hover:text-primary-dark"
                       >
                         <FiPlus size={12} />
                       </button>
@@ -371,7 +391,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                             newItems[index].name = e.target.value
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="flex-1 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                          className="flex-1 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                         />
                         <input
                           type="number"
@@ -382,7 +402,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                             newItems[index].quantity = parseFloat(e.target.value) || 0
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="w-16 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                          className="w-16 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                         />
                         <input
                           type="number"
@@ -393,7 +413,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                             newItems[index].unitPrice = parseFloat(e.target.value) || 0
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="w-20 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                          className="w-20 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                         />
                         <button
                           type="button"
@@ -413,7 +433,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                         onClick={() => {
                           setFormData({ ...formData, lineItems: [{ name: '', quantity: 1, unitPrice: 0 }] })
                         }}
-                        className="w-full text-xs text-primary hover:text-primary-dark py-1"
+                        className="w-full text-sm text-primary hover:text-primary-dark py-1"
                       >
                         Add line item
                       </button>
@@ -427,13 +447,13 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
             <div className="space-y-1.5 pt-0.5">
               {/* Start Date */}
               <div>
-                <label className="block text-[10px] font-medium text-neutral-dark/70 mb-0.5">Start Date</label>
+                <label className="block text-xs font-medium text-neutral-dark/70 mb-0.5">Start Date</label>
                 <input
                   type="text"
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                  className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                 />
               </div>
 
@@ -441,20 +461,20 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               <div className="flex items-end gap-1.5">
                 {/* Start Time */}
                 <div className="flex-1">
-                  <label className="block text-[10px] font-medium text-neutral-dark/70 mb-0.5">Start</label>
+                  <label className="block text-xs font-medium text-neutral-dark/70 mb-0.5">Start</label>
                   <input
                     type="text"
                     name="startTime"
                     value={formData.startTime}
                     onChange={handleChange}
                     placeholder="03:15 AM"
-                    className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                    className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
                   />
                 </div>
 
                 {/* End Time */}
                 <div className="flex-1">
-                  <label className="block text-[10px] font-medium text-neutral-dark/70 mb-0.5">End</label>
+                  <label className="block text-xs font-medium text-neutral-dark/70 mb-0.5">End</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -462,7 +482,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                       value={formData.endTime}
                       onChange={handleChange}
                       placeholder="04:15 AM"
-                      className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-xs pr-6"
+                      className="w-full px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm pr-6"
                     />
                     {formData.endTime && (
                       <button
@@ -486,36 +506,10 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                   onChange={(e) => setAnytime(e.target.checked)}
                   className="w-3 h-3 text-primary border-neutral-light rounded focus:ring-primary"
                 />
-                <label htmlFor="anytime" className="text-[10px] text-neutral-dark cursor-pointer">
+                <label htmlFor="anytime" className="text-xs text-neutral-dark cursor-pointer">
                   Anytime
                 </label>
               </div>
-            </div>
-
-            {/* Show Availability */}
-            <div className="pt-1.5 border-t border-neutral-light">
-              <div className="flex items-center gap-1 mb-0.5">
-                <label className="text-[10px] text-neutral-dark">Show availability</label>
-                <FiHelpCircle size={10} className="text-neutral-dark/50" />
-                <div className="ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setShowAvailability(!showAvailability)}
-                    className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${
-                      showAvailability ? 'bg-primary' : 'bg-neutral-light'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
-                        showAvailability ? 'translate-x-3' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-              <p className="text-[10px] text-neutral-dark/60">
-                Use Team filters to customize shown availability
-              </p>
             </div>
 
             {/* Footer Buttons */}
@@ -523,13 +517,13 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               <button
                 type="button"
                 onClick={onClose}
-                className="px-2.5 py-1 bg-white border border-neutral-light rounded text-neutral-dark hover:bg-neutral-light transition-colors text-[10px] font-medium"
+                className="px-2.5 py-1 bg-white border border-neutral-light rounded text-neutral-dark hover:bg-neutral-light transition-colors text-xs font-medium"
               >
                 More Options
               </button>
               <button
                 type="submit"
-                className="px-2.5 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-[10px] font-medium"
+                className="px-2.5 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-xs font-medium"
               >
                 Save
               </button>
@@ -537,6 +531,20 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
           </form>
         </div>
       </div>
+
+      {/* Add Client modal - same fields as Add Client flow in portal */}
+      <AddClientModal
+        isOpen={isAddClientOpen}
+        onClose={() => setIsAddClientOpen(false)}
+        mode="new"
+        onSuccess={(data) => {
+          setFormData(prev => ({
+            ...prev,
+            client: data.name,
+            address: data.address || prev.address,
+          }))
+        }}
+      />
     </div>
   )
 }

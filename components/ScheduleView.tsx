@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { 
   FiCalendar, 
   FiChevronLeft, 
@@ -18,6 +20,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 
 export default function ScheduleView() {
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -36,6 +39,7 @@ export default function ScheduleView() {
   const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false)
   const [teamSearchTerm, setTeamSearchTerm] = useState('')
   const [showUnscheduled, setShowUnscheduled] = useState(true)
+  const [showUnscheduledTooltip, setShowUnscheduledTooltip] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [datePickerMonth, setDatePickerMonth] = useState(new Date())
   const datePickerRef = useRef<HTMLDivElement>(null)
@@ -163,9 +167,14 @@ export default function ScheduleView() {
     option.label.toLowerCase().includes(teamSearchTerm.toLowerCase())
   )
 
-  // Format time for display
+  // Format time for display (convert 24h to 12h format)
   const formatTime = (time: string) => {
-    return time
+    if (!time) return ''
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
   }
 
   // Get unscheduled items
@@ -213,7 +222,116 @@ export default function ScheduleView() {
     }
   }
 
+  const eventDetailModal = selectedItem && typeof document !== 'undefined' && createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true">
+      <div className="absolute inset-0 bg-black/25" onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} />
+      <div
+        className="relative bg-white rounded-lg shadow-2xl border w-full max-w-[320px] max-h-[85vh] overflow-hidden flex flex-col min-w-[280px]"
+        style={{ borderColor: '#EAEBED' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between p-2.5 border-b flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-bold mb-0.5 truncate" style={{ color: '#1F271B' }}>{selectedItem!.title}</h2>
+            <span className="inline-block px-1 py-0.5 text-xs rounded" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>
+              {(selectedItem as any).type === 'tasks' ? 'Task' : (selectedItem as any).type === 'visits' ? 'Workorder' : 'Event'}
+            </span>
+          </div>
+          <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="p-0.5 rounded transition-colors" style={{ color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}>
+            <FiX size={14} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2.5">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <input type="checkbox" id="event-detail-completed" className="w-3 h-3 rounded focus:ring-1" style={{ borderColor: '#EAEBED' }} />
+            <label htmlFor="event-detail-completed" className="text-xs cursor-pointer" style={{ color: '#1F271B' }}>Completed</label>
+          </div>
+          {selectedItem!.clientName && (
+            <div className="mb-1.5">
+              <p className="text-xs" style={{ color: '#1F271B' }}>
+                {(selectedItem as any).type === 'tasks' ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/clients/${(selectedItem as any).clientId}`) }}
+                    className="underline hover:opacity-80 text-left"
+                    style={{ color: '#2B50AA' }}
+                  >
+                    {selectedItem!.clientName}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/clients/${(selectedItem as any).clientId}`) }}
+                      className="underline hover:opacity-80"
+                      style={{ color: '#2B50AA' }}
+                    >
+                      {selectedItem!.clientName}
+                    </button>
+                    {' / '}
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/workorders/${(selectedItem as any).id}`) }}
+                      className="underline hover:opacity-80"
+                      style={{ color: '#2B50AA' }}
+                    >
+                      #{selectedItem!.id}
+                    </button>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+          <div className="mb-1.5">
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>Team</span>
+              <button className="w-3.5 h-3.5 rounded-full text-white flex items-center justify-center transition-colors flex-shrink-0" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}>
+                <FiPlus size={10} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-0.5">
+              {selectedItem!.assignedTeamMember ? (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                  {selectedItem!.assignedTeamMember}
+                  <button className="hover:opacity-70"><FiX size={8} /></button>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                  All team members
+                  <button className="hover:opacity-70"><FiX size={8} /></button>
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+            <div>
+              <p className="text-xs mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Start</p>
+              <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{format(new Date(selectedItem!.schedule!.day), 'MMM d, yyyy')}</p>
+              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{selectedItem!.schedule!.startTime}</p>
+            </div>
+            <div>
+              <p className="text-xs mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>End</p>
+              <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{format(new Date(selectedItem!.schedule!.day), 'MMM d, yyyy')}</p>
+              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{selectedItem!.schedule!.endTime}</p>
+            </div>
+          </div>
+          <div className="flex gap-1.5 pt-1.5 border-t flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
+            <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="flex-1 px-2 py-1.5 bg-white border rounded transition-colors text-xs font-medium flex items-center justify-center gap-1 whitespace-nowrap" style={{ borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}>
+              <FiEdit size={10} />
+              Edit
+            </button>
+            <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="flex-1 px-2 py-1.5 rounded transition-colors text-xs font-medium text-white shadow-sm hover:shadow-md whitespace-nowrap flex items-center justify-center gap-1" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0'; e.currentTarget.style.transform = 'translateY(0)' }}>
+              View Details
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+
   return (
+    <>
     <div className="flex h-screen bg-white overflow-hidden w-full">
       <Sidebar 
         isOpen={sidebarOpen} 
@@ -223,9 +341,9 @@ export default function ScheduleView() {
       />
       <div className="flex-1 flex flex-col overflow-hidden bg-white w-full min-w-0 pl-4 lg:pl-6">
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        
-        <AddWorkorderModal 
-          isOpen={isAddWorkorderOpen} 
+
+      <AddWorkorderModal 
+        isOpen={isAddWorkorderOpen} 
           onClose={() => {
             setIsAddWorkorderOpen(false)
             setModalInitialDate(undefined)
@@ -235,49 +353,21 @@ export default function ScheduleView() {
           initialDate={modalInitialDate}
           initialTime={modalInitialTime}
           position={modalPosition}
-        />
+      />
 
       {/* Calendar Controls */}
       <div className="bg-white border-b px-2 sm:px-3 py-2" style={{ borderColor: '#EAEBED' }}>
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-3">
           {/* Left Side - Navigation */}
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1">
-            <button
-                onClick={() => handleDateChange('prev')}
-                className="p-1 rounded transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-            >
-                <FiChevronLeft size={14} />
-            </button>
-            <button
-                onClick={() => handleDateChange('today')}
-                className="px-2 py-1 text-xs font-medium rounded transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-            >
-              Today
-            </button>
-              <button
-                onClick={() => handleDateChange('next')}
-                className="p-1 rounded transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <FiChevronRight size={14} />
-              </button>
-            </div>
+            {/* Date Picker - First */}
             <div className="flex items-center gap-1 relative" ref={datePickerRef}>
               <button 
                 onClick={() => {
                   setIsDatePickerOpen(!isDatePickerOpen)
                   setDatePickerMonth(currentDate)
                 }}
-                className="px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-colors"
+                className="px-2 py-1.5 text-base font-medium rounded flex items-center gap-1 transition-colors"
                 style={{ color: '#1F271B' }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
@@ -326,7 +416,7 @@ export default function ScheduleView() {
                     >
                       <FiChevronLeft size={14} className="text-neutral-dark" />
                     </button>
-                    <span className="text-xs font-semibold text-neutral-dark">
+                    <span className="text-sm font-semibold text-neutral-dark">
                       {format(datePickerMonth, 'MMMM yyyy')}
                     </span>
                     <button
@@ -337,10 +427,10 @@ export default function ScheduleView() {
                     </button>
                   </div>
 
-                  {/* Days of Week */}
+                  {/* Days of Week - Mon to Sun */}
                   <div className="grid grid-cols-7 gap-0.5 mb-1.5">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                      <div key={day} className="text-center text-[10px] font-medium text-neutral-dark/70 py-0.5">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                      <div key={day} className="text-center text-xs font-medium text-neutral-dark/70 py-0.5">
                         {day}
                       </div>
                     ))}
@@ -351,8 +441,8 @@ export default function ScheduleView() {
                     {(() => {
                       const monthStart = startOfMonth(datePickerMonth)
                       const monthEnd = endOfMonth(datePickerMonth)
-                      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
-                      const calendarEnd = startOfWeek(addDays(monthEnd, 6), { weekStartsOn: 0 })
+                      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
+                      const calendarEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6)
                       const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
                       return calendarDays.map((day) => {
@@ -376,17 +466,18 @@ export default function ScheduleView() {
                               setIsDatePickerOpen(false)
                             }}
                             className={`
-                              w-7 h-7 text-[10px] rounded-full flex items-center justify-center relative transition-colors font-medium
+                              w-7 h-7 text-xs rounded-full flex items-center justify-center relative transition-colors font-medium
                               ${!isCurrentMonth ? 'text-neutral-dark/30' : 'text-neutral-dark'}
                               ${isSelected 
                                 ? 'bg-secondary text-white font-semibold' 
                                 : isCurrentDate 
-                                ? 'bg-neutral-light font-semibold hover:bg-neutral-light/80' 
+                                ? 'font-semibold text-white' 
                                 : hasEvents && !isSelected
                                 ? 'bg-amber-50 hover:bg-amber-100'
                                 : 'hover:bg-neutral-light'
                               }
                             `}
+                            style={isCurrentDate && !isSelected ? { backgroundColor: '#B084CC' } : undefined}
                           >
                             {dayNumber}
                             {isSelected && (
@@ -400,21 +491,36 @@ export default function ScheduleView() {
                 </div>
               )}
             </div>
+            {/* Two Arrows Together - After Date */}
+            <div className="flex items-center gap-0">
+              <button
+                onClick={() => handleDateChange('prev')}
+                className="p-1 rounded transition-colors"
+                style={{ color: '#1F271B' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                <FiChevronLeft size={14} />
+              </button>
+              <button
+                onClick={() => handleDateChange('next')}
+                className="p-1 rounded transition-colors"
+                style={{ color: '#1F271B' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+              >
+                <FiChevronRight size={14} />
+              </button>
+            </div>
+            {/* Today Button - After Arrows */}
             <button
-              onClick={() => setIsAddWorkorderOpen(true)}
-              className="px-2.5 py-1 rounded text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-              style={{ backgroundColor: '#28AFB0' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#1E8A8B'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#28AFB0'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
+              onClick={() => handleDateChange('today')}
+              className="px-2 py-1 text-sm font-medium rounded transition-colors"
+              style={{ color: '#1F271B' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
             >
-              <FiCalendar size={14} />
-              Find a Time
+              Today
             </button>
           </div>
 
@@ -424,7 +530,7 @@ export default function ScheduleView() {
             <div className="flex items-center border rounded overflow-hidden" style={{ borderColor: '#EAEBED' }}>
             <button
                 onClick={() => setView('month')}
-                className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                className={`px-2 py-1 text-sm font-medium transition-colors ${
                   view === 'month' 
                     ? 'text-white' 
                     : 'hover:bg-opacity-50'
@@ -448,7 +554,7 @@ export default function ScheduleView() {
             </button>
             <button
               onClick={() => setView('week')}
-                className={`px-2 py-1 text-[10px] font-medium transition-colors border-l ${
+                className={`px-2 py-1 text-sm font-medium transition-colors border-l ${
                   view === 'week' 
                     ? 'text-white' 
                     : 'hover:bg-opacity-50'
@@ -472,7 +578,7 @@ export default function ScheduleView() {
             </button>
             <button
                 onClick={() => setView('day')}
-                className={`px-2 py-1 text-[10px] font-medium transition-colors border-l ${
+                className={`px-2 py-1 text-sm font-medium transition-colors border-l ${
                   view === 'day' 
                     ? 'text-white' 
                     : 'hover:bg-opacity-50'
@@ -495,10 +601,44 @@ export default function ScheduleView() {
                 Day
               </button>
             </div>
-            {/* Mobile Unscheduled Toggle */}
+            {/* Unscheduled - separate div, se-green button with tooltip, same height as Day/Week/Month */}
+            <div className="relative flex items-center">
+              <button
+                onClick={() => setShowUnscheduled(!showUnscheduled)}
+                className="py-1 px-2 rounded flex items-center justify-center flex-shrink-0 transition-colors min-h-[22px] min-w-[22px]"
+                style={{ backgroundColor: '#28AFB0' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1E8A8B'
+                  setShowUnscheduledTooltip(true)
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#28AFB0'
+                  setShowUnscheduledTooltip(false)
+                }}
+                title="Unscheduled"
+              >
+                <span className="relative inline-flex items-center justify-center">
+                  <FiCalendar size={14} className="text-white" />
+                  <FiX size={8} className="text-white absolute -top-0.5 -right-0.5" strokeWidth={3} />
+                </span>
+              </button>
+              {showUnscheduledTooltip && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 px-2 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap"
+                  style={{ backgroundColor: '#1F271B' }}
+                >
+                  Unscheduled
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 -top-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px]"
+                    style={{ borderBottomColor: '#1F271B' }}
+                  />
+                </div>
+              )}
+            </div>
+            {/* Mobile Unscheduled Toggle - text fallback */}
             <button
               onClick={() => setShowUnscheduled(!showUnscheduled)}
-              className="lg:hidden px-2 py-1 text-[10px] font-medium border rounded transition-colors"
+              className="lg:hidden px-2 py-1 text-sm font-medium border rounded transition-colors"
               style={{ borderColor: '#EAEBED', color: '#1F271B' }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
@@ -512,13 +652,13 @@ export default function ScheduleView() {
         <div className="flex items-center gap-1 mt-2">
           {/* Type Filter Dropdown */}
           <div ref={typeDropdownRef} className="relative flex items-center border rounded overflow-visible" style={{ borderColor: '#EAEBED' }}>
-                <span className="px-2 py-1 text-[10px] font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Type</span>
+                <span className="px-2 py-1 text-sm font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Type</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     setIsTypeDropdownOpen(!isTypeDropdownOpen)
                   }}
-                  className={`px-2 py-1 text-[10px] font-medium flex items-center gap-1 transition-colors ${
+                  className={`px-2 py-1 text-sm font-medium flex items-center gap-1 transition-colors ${
                     selectedTypes.size === 2 
                       ? 'bg-white border-l' 
                       : 'hover:bg-opacity-50'
@@ -550,18 +690,18 @@ export default function ScheduleView() {
                         placeholder="Search types..."
                         value={typeSearchTerm}
                         onChange={(e) => setTypeSearchTerm(e.target.value)}
-                        className="w-full px-2 py-1 text-[10px] border rounded focus:outline-none focus:ring-1"
+                        className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
                         style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
                     {/* Selected Count */}
                     <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-[10px]" style={{ color: '#1F271B' }}>{selectedTypes.size} selected</span>
+                      <span className="text-xs" style={{ color: '#1F271B' }}>{selectedTypes.size} selected</span>
                       {selectedTypes.size > 0 && (
                         <button
                           onClick={() => clearTypeSelection()}
-                          className="text-[10px] underline"
+                          className="text-xs underline"
                           style={{ color: '#28AFB0' }}
                         >
                           Clear
@@ -587,7 +727,7 @@ export default function ScheduleView() {
                                   <FiCheckCircle className={option.value === 'visits' ? 'text-green-500' : 'text-neutral-dark'} size={10} />
                                 )}
                               </div>
-                              <span className="text-[10px]" style={{ color: '#1F271B' }}>{option.label}</span>
+                              <span className="text-xs" style={{ color: '#1F271B' }}>{option.label}</span>
                             </div>
                           </div>
                         )
@@ -598,13 +738,13 @@ export default function ScheduleView() {
               </div>
           {/* Team Filter Dropdown */}
           <div ref={teamDropdownRef} className="relative flex items-center border rounded overflow-visible" style={{ borderColor: '#EAEBED' }}>
-            <span className="px-2 py-1 text-[10px] font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Team</span>
+            <span className="px-2 py-1 text-sm font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Team</span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setIsTeamDropdownOpen(!isTeamDropdownOpen)
               }}
-              className={`px-2 py-1 text-[10px] font-medium flex items-center gap-1 transition-colors ${
+              className={`px-2 py-1 text-sm font-medium flex items-center gap-1 transition-colors ${
                 teamFilter === 'all' 
                   ? 'bg-white border-l' 
                   : 'hover:bg-opacity-50'
@@ -636,7 +776,7 @@ export default function ScheduleView() {
                         placeholder="Search team..."
                         value={teamSearchTerm}
                         onChange={(e) => setTeamSearchTerm(e.target.value)}
-                        className="w-full px-2 py-1 text-[10px] border rounded focus:outline-none focus:ring-1"
+                        className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
                         style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                         onClick={(e) => e.stopPropagation()}
                       />
@@ -670,7 +810,7 @@ export default function ScheduleView() {
                             <div className="flex items-center gap-1.5">
                               {option.value !== 'all' && option.value !== 'unassigned' && (
                                 <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#2B50AA', opacity: 0.2 }}>
-                                  <span className="text-[9px] font-semibold" style={{ color: '#2B50AA' }}>
+                                  <span className="text-xs font-semibold" style={{ color: '#2B50AA' }}>
                                     {getInitials(option.label)}
                                   </span>
                                 </div>
@@ -678,7 +818,7 @@ export default function ScheduleView() {
                               {option.value === 'unassigned' && (
                                 <FiUsers style={{ color: '#1F271B', opacity: 0.7 }} size={12} />
                               )}
-                              <span className="text-[10px]" style={{ color: '#1F271B' }}>{option.label}</span>
+                              <span className="text-xs" style={{ color: '#1F271B' }}>{option.label}</span>
                             </div>
                             {isSelected && (
                               <FiCheckCircle className="text-green-500" size={12} />
@@ -715,282 +855,178 @@ export default function ScheduleView() {
         >
           {view === 'day' && (
             <div className="h-full flex flex-col" style={{ backgroundColor: '#F3F4F6' }}>
-              {/* Day Header */}
-              <div className="sticky top-0 bg-white border-b z-20 px-3 py-2" style={{ borderColor: '#EAEBED' }}>
-                <h2 className="text-sm font-medium" style={{ color: '#1F271B' }}>
-                  {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                </h2>
+              {/* Day Header - same pink pill for today as week/month view */}
+              <div className="sticky top-0 bg-white border-b z-20 px-3 py-2 flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
+                {isToday(currentDate) ? (
+                  <span className="inline-flex items-center rounded px-2 py-1 text-base font-medium text-white" style={{ backgroundColor: '#B084CC' }}>
+                    {format(currentDate, 'EEE d')}
+                  </span>
+                ) : (
+                  <h2 className="text-base font-medium" style={{ color: '#1F271B' }}>
+                    {format(currentDate, 'EEE d')}
+                  </h2>
+                )}
               </div>
 
               {/* Timeline Grid */}
               <div className="flex-1 overflow-y-auto">
-                <div className="flex">
+                <div className="flex flex-col">
+                  {/* Horizontal Time Labels Row */}
+                  <div className="flex sticky top-0 bg-white border-b z-15" style={{ borderColor: '#EAEBED' }}>
+                    {/* Empty space for team members column */}
+                    <div className="w-48 flex-shrink-0 border-r" style={{ borderColor: '#EAEBED' }}></div>
+                    {/* Anytime column (to the left of 8:00) */}
+                    <div className="w-16 flex-shrink-0 border-r flex items-center justify-center px-1 py-1" style={{ borderColor: '#EAEBED' }}>
+                      <span className="text-xs font-medium" style={{ color: '#1F271B' }}>Anytime</span>
+                    </div>
+                    {/* Time labels */}
+                    <div className="flex-1 flex">
+                      {hours.map((hour) => (
+                        <div 
+                          key={hour}
+                          className="flex-1 border-r last:border-r-0 px-2 py-1 text-center"
+                          style={{ borderColor: '#EAEBED' }}
+                        >
+                          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                            {hour.toString().padStart(2, '0')}:00
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex">
+                  {/* Team Members Column - Left Side */}
+                  <div className="w-48 flex-shrink-0 border-r bg-white" style={{ borderColor: '#EAEBED' }}>
+                    {/* Anytime Row */}
+                    <div className="px-2 py-2 flex items-center justify-between border-b" style={{ borderColor: '#EAEBED' }}>
+                      <span className="text-xs font-medium" style={{ color: '#1F271B' }}>Anytime</span>
+                      <FiChevronRight size={12} className="rotate-90" style={{ color: '#1F271B', opacity: 0.5 }} />
+                    </div>
+                    
+                    {/* Team Members List */}
+                    <div className="divide-y" style={{ borderColor: '#EAEBED' }}>
+                      {/* Unassigned */}
+                      <div className="px-2 py-2 flex items-center justify-between" style={{ minHeight: `${hours.length * 60 / (allTeamMembers.length + 2)}px` }}>
+                        <div className="flex items-center gap-2">
+                          <FiUsers size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
+                          <span className="text-sm" style={{ color: '#1F271B' }}>Unassigned</span>
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: '#1F271B' }}>
+                          {scheduledItems.filter(item => !item.assignedTeamMember && item.schedule?.day && isSameDay(new Date(item.schedule.day), currentDate)).length}
+                        </span>
+                      </div>
+                      
+                      {/* Each Team Member */}
+                      {allTeamMembers.map((member) => {
+                        const memberItems = scheduledItems.filter(item => 
+                          item.assignedTeamMember === member.name && 
+                          item.schedule?.day && 
+                          isSameDay(new Date(item.schedule.day), currentDate)
+                        )
+                        return (
+                          <div 
+                            key={member.id} 
+                            className="px-2 py-2 flex items-center justify-between"
+                            style={{ minHeight: `${hours.length * 60 / (allTeamMembers.length + 2)}px` }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F3F4F6' }}>
+                                <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                                  {getInitials(member.name)}
+                                </span>
+                              </div>
+                              <span className="text-sm" style={{ color: '#1F271B' }}>{member.name}</span>
+                            </div>
+                            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                              {memberItems.length}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {/* Time Column */}
                   <div className="w-16 flex-shrink-0 border-r" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
-                    {hours.map((hour) => (
-                      <div
-                        key={hour}
-                        className="border-b relative"
-                        style={{ minHeight: '60px', borderColor: '#EAEBED' }}
-                      >
-                        <div className="absolute top-1.5 left-1.5 text-xs" style={{ color: '#1F271B' }}>
-                          {hour.toString().padStart(2, '0')}:00
-                        </div>
-                        {/* Current time indicator */}
-                        {isToday(currentDate) && hour === currentHour && (
-                          <div 
-                            className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
-                            style={{ top: `${(currentMinute / 60) * 60}px` }}
+                    {/* Empty space for Anytime row */}
+                    <div className="border-b sticky top-0 bg-white z-10" style={{ minHeight: '40px', borderColor: '#EAEBED' }}></div>
+                    {/* Anytime column body - no time labels */}
+                    {[...Array(allTeamMembers.length + 1)].map((_, rowIndex) => (
+                      <div key={rowIndex} className="border-b" style={{ minHeight: `${hours.length * 60}px`, borderColor: '#EAEBED' }}>
+                        {hours.map((hour, hourIndex) => (
+                          <div
+                            key={hour}
+                            className="border-b relative"
+                            style={{ minHeight: '60px', borderColor: '#EAEBED' }}
                           >
-                            <div className="absolute -left-1 -top-1 w-0 h-0 border-l-[5px] border-l-red-500 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent"></div>
+                            {/* Current time indicator */}
+                            {isToday(currentDate) && hour === currentHour && hourIndex === 0 && (
+                              <div 
+                                className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
+                                style={{ top: `${(currentMinute / 60) * 60}px` }}
+                              >
+                                <div className="absolute -left-1 -top-1 w-0 h-0 border-l-[5px] border-l-red-500 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent"></div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        ))}
                       </div>
                     ))}
                   </div>
 
-                  {/* Events Column */}
+                  {/* Events Column - One row per team member */}
                   <div className="flex-1 relative" style={{ minHeight: `${hours.length * 60}px`, backgroundColor: '#F3F4F6' }}>
-                    {/* Detail View Modal - Positioned within calendar */}
-                    {selectedItem && view === 'day' && (
-                      <div 
-                        className="absolute bg-white rounded shadow-2xl w-[260px] max-h-[360px] overflow-hidden flex flex-col border z-50"
-                        style={{
-                          top: '15px',
-                          left: '15px',
-                          borderColor: '#EAEBED'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {/* Header */}
-                        <div className="flex items-start justify-between p-2 border-b" style={{ borderColor: '#EAEBED' }}>
-                          <div className="flex-1 min-w-0">
-                            <h2 className="text-xs font-bold mb-0.5 truncate" style={{ color: '#1F271B' }}>{selectedItem.title}</h2>
-                            <span className="inline-block px-1 py-0.5 text-[9px] rounded" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>
-                              {(selectedItem as any).type === 'tasks' ? 'Task' : (selectedItem as any).type === 'visits' ? 'Workorder' : 'Event'}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedItem(null)
-                              setSelectedItemPosition(undefined)
-                            }}
-                            className="p-0.5 rounded transition-colors"
-                            style={{ color: '#1F271B' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                          >
-                            <FiX size={12} />
-                          </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-2">
-                          {/* Completed Checkbox */}
-                          <div className="flex items-center gap-1 mb-1.5">
-                            <input
-                              type="checkbox"
-                              id="completed"
-                              className="w-2.5 h-2.5 rounded focus:ring-1"
-                              style={{ borderColor: '#EAEBED' }}
-                            />
-                            <label htmlFor="completed" className="text-[10px] cursor-pointer" style={{ color: '#1F271B' }}>
-                              Completed
-                            </label>
-                          </div>
-
-                          {/* Description/Notes */}
-                          {(selectedItem.instructions || selectedItem.notes) && (
-                            <div className="mb-1.5">
-                              <p className="text-[10px] line-clamp-2" style={{ color: '#1F271B' }}>
-                                {selectedItem.instructions || selectedItem.notes || '-'}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Team Section */}
-                          <div className="mb-1.5">
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <span className="text-[10px] font-semibold" style={{ color: '#1F271B' }}>Team</span>
-                              <button className="w-3 h-3 rounded-full text-white flex items-center justify-center transition-colors" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}>
-                                <FiPlus size={8} />
-                              </button>
-                            </div>
-                            <div className="flex flex-wrap gap-0.5">
-                              {selectedItem.assignedTeamMember ? (
-                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                                  {selectedItem.assignedTeamMember}
-                                  <button className="hover:opacity-70">
-                                    <FiX size={7} />
-                                  </button>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                                  All team members
-                                  <button className="hover:opacity-70">
-                                    <FiX size={7} />
-                                  </button>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Start and End Times */}
-                          <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                            <div>
-                              <p className="text-[9px] mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Start</p>
-                              <p className="text-[10px] font-medium" style={{ color: '#1F271B' }}>
-                                {format(new Date(selectedItem.schedule.day), 'MMM d, yyyy')}
-                              </p>
-                              <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
-                                {selectedItem.schedule.startTime}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>End</p>
-                              <p className="text-[10px] font-medium" style={{ color: '#1F271B' }}>
-                                {format(new Date(selectedItem.schedule.day), 'MMM d, yyyy')}
-                              </p>
-                              <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
-                                {selectedItem.schedule.endTime}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex gap-1 pt-1.5 border-t" style={{ borderColor: '#EAEBED' }}>
-                            <button
-                              onClick={() => {
-                                setSelectedItem(null)
-                                setSelectedItemPosition(undefined)
+                    {/* Only 2 event blocks for the day - properly aligned */}
+                    <div className="absolute inset-0 flex flex-col gap-2 pt-2 px-1.5">
+                      {(() => {
+                        const dayItems = scheduledItems
+                          .filter(item => item.schedule?.day && item.schedule?.startTime && isSameDay(new Date(item.schedule.day), currentDate))
+                          .sort((a, b) => {
+                            const aMin = parseInt(a.schedule!.startTime.split(':')[0]) * 60 + parseInt(a.schedule!.startTime.split(':')[1])
+                            const bMin = parseInt(b.schedule!.startTime.split(':')[0]) * 60 + parseInt(b.schedule!.startTime.split(':')[1])
+                            return aMin - bMin
+                          })
+                          .slice(0, 1)
+                        return dayItems.map((item, index) => {
+                          let bgColor = 'bg-blue-50'
+                          let borderLeftColor = '#2B50AA'
+                          const itemType = (item as any).type
+                          if (itemType === 'visits') {
+                            bgColor = 'bg-blue-50'
+                            borderLeftColor = '#2B50AA'
+                          } else if (itemType === 'tasks') {
+                            bgColor = 'bg-purple-100'
+                            borderLeftColor = '#B084CC'
+                          }
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedItem(item)
+                                setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                               }}
-                              className="flex-1 px-1.5 py-0.5 bg-white border rounded transition-colors text-[9px] font-medium flex items-center justify-center gap-0.5"
-                              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
-                            >
-                              <FiEdit size={9} />
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedItem(null)
-                                setSelectedItemPosition(undefined)
-                              }}
-                              className="flex-1 px-1.5 py-0.5 rounded transition-colors text-[9px] font-medium text-white shadow-sm hover:shadow-md"
-                              style={{ backgroundColor: '#28AFB0' }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#1E8A8B'
-                                e.currentTarget.style.transform = 'translateY(-1px)'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#28AFB0'
-                                e.currentTarget.style.transform = 'translateY(0)'
+                              className={`flex items-center rounded overflow-hidden ${bgColor} cursor-pointer hover:shadow-md transition-all flex-shrink-0`}
+                              style={{
+                                borderLeft: `3px solid ${borderLeftColor}`,
+                                minHeight: '48px',
+                                padding: '10px 12px'
                               }}
                             >
-                              View Details
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Render all events for this day positioned absolutely */}
-                    {(() => {
-                      const dayItems = scheduledItems.filter(item => {
-                        if (!item.schedule?.day || !item.schedule?.startTime) return false
-                        const itemDate = new Date(item.schedule.day)
-                        return isSameDay(itemDate, currentDate)
-                      })
-
-                      // Sort items by start time to ensure proper rendering order
-                      const sortedItems = [...dayItems].sort((a, b) => {
-                        const aTime = parseInt(a.schedule.startTime.split(':')[0]) * 60 + parseInt(a.schedule.startTime.split(':')[1])
-                        const bTime = parseInt(b.schedule.startTime.split(':')[0]) * 60 + parseInt(b.schedule.startTime.split(':')[1])
-                        return aTime - bTime
-                      })
-
-                      return sortedItems.map((item, index) => {
-                        const startMinutes = parseInt(item.schedule.startTime.split(':')[0]) * 60 + parseInt(item.schedule.startTime.split(':')[1])
-                        const endMinutes = parseInt(item.schedule.endTime.split(':')[0]) * 60 + parseInt(item.schedule.endTime.split(':')[1])
-                        const durationHours = (endMinutes - startMinutes) / 60
-                        const startHour = parseInt(item.schedule.startTime.split(':')[0])
-                        const startMinute = parseInt(item.schedule.startTime.split(':')[1])
-                        
-                        // Calculate position from top of the timeline (8 AM = 0)
-                        const topPosition = ((startHour - 8) * 60) + startMinute
-                        const height = Math.max(durationHours * 60, 60)
-
-                        // Determine event color based on type or use default
-                        // Match the image: light blue for visits, darker purple for tasks
-                        let bgColor = 'bg-blue-50'
-                        let borderLeftColor = '#2B50AA' // Sapphire for visits
-                        
-                        const itemType = (item as any).type
-                        if (itemType === 'visits') {
-                          bgColor = 'bg-blue-50' // Light blue background
-                          borderLeftColor = '#2B50AA' // Darker blue left bar (Sapphire)
-                        } else if (itemType === 'tasks') {
-                          bgColor = 'bg-purple-100' // Darker purple background
-                          borderLeftColor = '#B084CC' // Darker purple left bar (Amethyst Smoke)
-                        } else if (itemType === 'events') {
-                          bgColor = 'bg-yellow-50'
-                          borderLeftColor = '#F59E0B' // Amber/yellow
-                        }
-
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedItem(item)
-                              setSelectedItemPosition({ x: e.clientX, y: e.clientY })
-                            }}
-                            className={`absolute left-3 right-3 rounded-md ${bgColor} cursor-pointer hover:shadow-md transition-all`}
-                            style={{
-                              top: `${topPosition}px`,
-                              height: `${height}px`,
-                              minHeight: '60px',
-                              borderLeft: `3px solid ${borderLeftColor}`,
-                              padding: '8px 10px',
-                              zIndex: 10 + index // Ensure proper stacking order
-                            }}
-                          >
-                            <div className="flex flex-col h-full justify-center gap-0.5">
-                              <p className="text-xs font-semibold leading-tight" style={{ color: '#1F271B' }}>
-                                {item.clientName} - {item.title}
-                              </p>
-                              <p className="text-[10px] leading-tight" style={{ color: '#1F271B', opacity: 0.7 }}>
-                                {formatTime(item.schedule.startTime)} ({durationHours}h) - {item.assignedTeamMember || 'Unassigned'}
-                              </p>
+                              <span className="text-sm font-medium truncate block min-w-0" style={{ color: '#1F271B' }} title={`${item.clientName} · ${item.title}`}>
+                                {item.clientName} · {item.title}
+                              </span>
                             </div>
-                          </div>
-                        )
-                      })
-                    })()}
-                    
-                    {/* Hour slots for grid lines */}
-                    {hours.map((hour) => (
-                      <div
-                        key={hour}
-                        className="border-b relative cursor-pointer"
-                        style={{ minHeight: '60px', borderColor: '#EAEBED' }}
-                        onClick={(e) => {
-                          const clickedDate = new Date(currentDate)
-                          const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-                          const ampm = hour >= 12 ? 'PM' : 'AM'
-                          const formattedTime = `${hour12}:00 ${ampm}`
-                          setModalInitialDate(clickedDate)
-                          setModalInitialTime(formattedTime)
-                          setModalPosition({ x: e.clientX, y: e.clientY })
-                          setIsAddWorkorderOpen(true)
-                        }}
-                      />
-                    ))}
+                          )
+                        })
+                      })()}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
           )}
 
       {view === 'week' && (
@@ -1008,15 +1044,15 @@ export default function ScheduleView() {
                   >
                     {isToday(day) ? (
                       <div className="rounded px-2 py-1 inline-flex items-center justify-center gap-0.5" style={{ backgroundColor: '#B084CC' }}>
-                        <span className="text-[9px] text-white font-medium">{format(day, 'EEE')}</span>
-                        <span className="text-xs font-semibold text-white">
+                        <span className="text-xs text-white font-medium">{format(day, 'EEE')}</span>
+                        <span className="text-sm font-semibold text-white">
                           {format(day, 'd')}
                         </span>
                       </div>
                     ) : (
                       <>
-                        <p className="text-[9px] mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>{format(day, 'EEE')}</p>
-                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>
+                        <p className="text-xs mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>{format(day, 'EEE')}</p>
+                        <p className="text-sm font-semibold" style={{ color: '#1F271B' }}>
                   {format(day, 'd')}
                 </p>
                       </>
@@ -1030,14 +1066,14 @@ export default function ScheduleView() {
                 <div className="grid w-full" style={{ gridTemplateColumns: 'minmax(60px, 80px) repeat(7, minmax(0, 1fr))' }}>
                   {/* Time Column */}
                   <div className="border-r border-neutral-dark/15 flex-shrink-0 bg-gray-100">
-                    <div className="p-1.5 text-[10px] text-neutral-dark/50 font-medium">↓ Anytime</div>
+                    <div className="p-1.5 text-sm text-neutral-dark/50 font-medium">↓ Anytime</div>
             {hours.map((hour) => (
                       <div
                         key={hour}
                         className="border-b border-neutral-dark/15 relative"
                         style={{ minHeight: '48px' }}
                       >
-                        <div className="absolute top-1 left-1.5 text-[11px] text-neutral-dark/50 whitespace-nowrap">
+                        <div className="absolute top-1 left-1.5 text-sm text-neutral-dark/50 whitespace-nowrap">
                           {hour.toString().padStart(2, '0')}:00
                 </div>
                         {/* Current time indicator */}
@@ -1055,138 +1091,13 @@ export default function ScheduleView() {
 
                   {/* Day Columns */}
                   {weekDays.map((day) => (
-                    <div key={day.toString()} className="border-r last:border-r-0 relative" style={{ minHeight: `${hours.length * 48}px`, borderColor: '#EAEBED' }}>
-                      {/* Detail View Modal - Positioned within calendar for week view */}
-                      {selectedItem && view === 'week' && isSameDay(new Date(selectedItem.schedule.day), day) && (
-                        <div 
-                          className="absolute bg-white rounded shadow-2xl w-[260px] max-h-[360px] overflow-hidden flex flex-col border z-50"
-                          style={{
-                            top: '15px',
-                            left: '15px',
-                            borderColor: '#EAEBED'
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {/* Header */}
-                          <div className="flex items-start justify-between p-2 border-b" style={{ borderColor: '#EAEBED' }}>
-                            <div className="flex-1 min-w-0">
-                              <h2 className="text-xs font-bold mb-0.5 truncate" style={{ color: '#1F271B' }}>{selectedItem.title}</h2>
-                              <span className="inline-block px-1 py-0.5 text-[9px] rounded" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>
-                                {(selectedItem as any).type === 'tasks' ? 'Task' : (selectedItem as any).type === 'visits' ? 'Workorder' : 'Event'}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setSelectedItem(null)
-                                setSelectedItemPosition(undefined)
-                              }}
-                              className="p-0.5 rounded transition-colors"
-                              style={{ color: '#1F271B' }}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                            >
-                              <FiX size={12} />
-                            </button>
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex-1 overflow-y-auto p-2.5">
-                            {/* Completed Checkbox */}
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <input
-                                type="checkbox"
-                                id="completed-week"
-                                className="w-3 h-3 text-primary border-neutral-light rounded focus:ring-primary"
-                              />
-                              <label htmlFor="completed-week" className="text-xs text-neutral-dark cursor-pointer">
-                                Completed
-                              </label>
-                            </div>
-
-                            {/* Description/Notes */}
-                            {(selectedItem.instructions || selectedItem.notes) && (
-                              <div className="mb-2">
-                                <p className="text-xs text-neutral-dark line-clamp-2">
-                                  {selectedItem.instructions || selectedItem.notes || '-'}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Team Section */}
-                            <div className="mb-2">
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="text-xs font-semibold text-neutral-dark">Team</span>
-                                <button className="w-4 h-4 rounded-full bg-secondary text-white flex items-center justify-center hover:bg-secondary-dark transition-colors">
-                                  <FiPlus size={10} />
-                                </button>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {selectedItem.assignedTeamMember ? (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-neutral-light text-neutral-dark text-[10px] rounded-full">
-                                    {selectedItem.assignedTeamMember}
-                                    <button className="hover:text-neutral-dark/70">
-                                      <FiX size={8} />
-                                    </button>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-neutral-light text-neutral-dark text-[10px] rounded-full">
-                                    All team members
-                                    <button className="hover:text-neutral-dark/70">
-                                      <FiX size={8} />
-                                    </button>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Start and End Times */}
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                              <div>
-                                <p className="text-[10px] text-neutral-dark/70 mb-0.5">Start</p>
-                                <p className="text-xs font-medium text-neutral-dark">
-                                  {format(new Date(selectedItem.schedule.day), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-xs text-neutral-dark/70">
-                                  {selectedItem.schedule.startTime}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-neutral-dark/70 mb-0.5">End</p>
-                                <p className="text-xs font-medium text-neutral-dark">
-                                  {format(new Date(selectedItem.schedule.day), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-xs text-neutral-dark/70">
-                                  {selectedItem.schedule.endTime}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-1.5 pt-2 border-t border-neutral-light">
-                              <button
-                                onClick={() => {
-                                  setSelectedItem(null)
-                                  setSelectedItemPosition(undefined)
-                                }}
-                                className="flex-1 px-2 py-1 bg-white border border-neutral-light rounded text-neutral-dark hover:bg-neutral-light transition-colors text-[10px] font-medium flex items-center justify-center gap-1"
-                              >
-                                <FiEdit size={10} />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedItem(null)
-                                  setSelectedItemPosition(undefined)
-                                }}
-                                className="flex-1 px-2 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-[10px] font-medium"
-                              >
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
+                    <div key={day.toString()} className="border-r last:border-r-0 relative overflow-hidden bg-white" style={{ minHeight: `${hours.length * 48}px`, borderColor: '#EAEBED' }}>
+                      {/* Hour grid - visual structure so events align to column */}
+                      <div className="absolute inset-0 pointer-events-none flex flex-col">
+                        {hours.map((hour) => (
+                          <div key={hour} style={{ minHeight: '48px' }} />
+                        ))}
+                      </div>
                       {/* Render all events for this day positioned absolutely */}
                       {(() => {
                         const dayItems = scheduledItems.filter(item => {
@@ -1237,35 +1148,34 @@ export default function ScheduleView() {
                                 setSelectedItem(item)
                                 setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                               }}
-                              className={`absolute left-1.5 right-1.5 rounded ${bgColor} cursor-pointer hover:shadow-md transition-all`}
+                              className={`absolute rounded overflow-hidden ${bgColor} cursor-pointer hover:shadow-md transition-all`}
                               style={{
+                                left: '6px',
+                                right: '6px',
                                 top: `${topPosition}px`,
                                 height: `${height}px`,
-                                minHeight: '48px',
+                                minHeight: '32px',
                                 borderLeft: `3px solid ${borderLeftColor}`,
                                 padding: '6px 8px',
-                                zIndex: 10 + index // Ensure proper stacking order
+                                zIndex: 10 + index
                               }}
                             >
-                              <div className="flex flex-col h-full justify-center gap-0.5">
-                                <p className="text-[10px] font-semibold leading-tight truncate" style={{ color: '#1F271B' }}>
-                                  {item.clientName} - {item.title}
-                                </p>
-                                <p className="text-[9px] leading-tight" style={{ color: '#1F271B', opacity: 0.7 }}>
-                                  {formatTime(item.schedule.startTime)} ({durationHours}h) - {item.assignedTeamMember || 'Unassigned'}
-                                </p>
+                              <div className="flex flex-row items-center h-full w-full min-w-0 overflow-hidden">
+                                <span className="text-sm font-medium truncate block min-w-0" style={{ color: '#1F271B' }} title={`${item.clientName} · ${item.title}`}>
+                                  {item.clientName} · {item.title}
+                                </span>
                               </div>
                             </div>
                           )
                         })
                       })()}
                       
-                      {/* Hour slots for grid lines */}
+                      {/* Hour slots - clickable for adding events */}
                       {hours.map((hour) => (
                         <div
                           key={hour}
-                          className="border-b relative cursor-pointer"
-                          style={{ minHeight: '48px', borderColor: '#EAEBED' }}
+                          className="absolute left-0 right-0 border-b cursor-pointer z-0"
+                          style={{ top: `${(hour - 8) * 48}px`, height: '48px', borderColor: '#EAEBED' }}
                           onClick={() => {
                             const clickedDate = new Date(day)
                             const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
@@ -1288,12 +1198,12 @@ export default function ScheduleView() {
             <div className="h-full flex flex-col p-3" style={{ backgroundColor: '#F3F4F6' }}>
               {/* Month Calendar Grid */}
         <div className="bg-white rounded shadow-sm border overflow-hidden" style={{ borderColor: '#EAEBED' }}>
-                {/* Day Headers */}
+                {/* Day Headers - Mon to Sun */}
                 <div className="grid grid-cols-7 border-b bg-white" style={{ borderColor: '#EAEBED' }}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => {
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
                     const today = new Date()
-                    const currentDayOfWeek = getDay(today) // 0 = Sunday, 1 = Monday, etc.
-                    const isCurrentDay = currentDayOfWeek === index
+                    const currentDayOfWeek = getDay(today) // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                    const isCurrentDay = (currentDayOfWeek + 6) % 7 === index
                     
               return (
                       <div
@@ -1301,9 +1211,9 @@ export default function ScheduleView() {
                         className={`p-2 text-center border-r last:border-r-0 ${
                           isCurrentDay ? 'rounded-t' : ''
                         }`}
-                        style={{ borderColor: '#EAEBED', backgroundColor: isCurrentDay ? '#2B50AA' : 'white' }}
+                        style={{ borderColor: '#EAEBED', backgroundColor: isCurrentDay ? '#B084CC' : 'white' }}
                       >
-                        <span className={`text-[10px] font-medium ${
+                        <span className={`text-xs font-medium ${
                           isCurrentDay ? 'text-white' : ''
                         }`}
                         style={!isCurrentDay ? { color: '#1F271B' } : {}}
@@ -1320,8 +1230,8 @@ export default function ScheduleView() {
                   {(() => {
                     const monthStart = startOfMonth(currentDate)
                     const monthEnd = endOfMonth(currentDate)
-                    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 }) // Sunday start for month view
-                    const calendarEnd = startOfWeek(addDays(monthEnd, 6), { weekStartsOn: 0 })
+                    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
+                    const calendarEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6)
                     const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
                     return calendarDays.map((day, index) => {
@@ -1362,7 +1272,7 @@ export default function ScheduleView() {
                                   : ''
                               }`}
                               style={isCurrentDate 
-                                ? { borderColor: '#2B50AA', color: '#2B50AA' }
+                                ? { borderColor: '#B084CC', color: '#B084CC' }
                                 : isCurrentMonth
                                 ? { color: '#1F271B' }
                                 : { color: '#1F271B', opacity: 0.4 }
@@ -1370,7 +1280,7 @@ export default function ScheduleView() {
                             >
                               {dayNumber}
                             </span>
-                          </div>
+                  </div>
                           
                           {/* Events List */}
                           <div className="space-y-0.5 mt-0.5">
@@ -1398,7 +1308,7 @@ export default function ScheduleView() {
                                     setSelectedItem(item)
                                     setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                                   }}
-                                  className={`text-[9px] px-1 py-0.5 rounded ${bgColor} cursor-pointer hover:opacity-80 truncate`}
+                                  className={`text-xs px-1 py-0.5 rounded ${bgColor} cursor-pointer hover:opacity-80 truncate`}
                                   style={{ borderLeft: `2px solid ${borderColor}` }}
                                 >
                                   {item.schedule?.startTime && (
@@ -1409,7 +1319,7 @@ export default function ScheduleView() {
               )
             })}
                             {dayEvents.length > 3 && (
-                              <div className="text-[9px] px-1" style={{ color: '#1F271B', opacity: 0.6 }}>
+                              <div className="text-xs px-1" style={{ color: '#1F271B', opacity: 0.6 }}>
                                 +{dayEvents.length - 3} more
                               </div>
                             )}
@@ -1467,5 +1377,7 @@ export default function ScheduleView() {
 
       </div>
     </div>
+    {eventDetailModal}
+    </>
   )
 }

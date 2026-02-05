@@ -40,7 +40,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <input
               type="text"
               placeholder="Search..."
-              className="bg-transparent border-none outline-none text-sm w-48"
+              className="bg-transparent border-none outline-none text-base w-48"
             />
           </div>
 

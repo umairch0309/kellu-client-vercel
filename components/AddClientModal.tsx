@@ -19,14 +19,26 @@ interface Client {
   tags?: string[]
 }
 
+export type NewClientData = {
+  name: string
+  phone: string
+  email?: string
+  documentNumber?: string
+  address?: string
+  leadSource?: string
+  notes?: string
+}
+
 interface AddClientModalProps {
   isOpen: boolean
   onClose: () => void
   client?: Client
   mode?: 'new' | 'update'
+  /** When provided, called with the new client data on save (e.g. to fill a parent form like workorder) */
+  onSuccess?: (data: NewClientData) => void
 }
 
-export default function AddClientModal({ isOpen, onClose, client, mode = 'new' }: AddClientModalProps) {
+export default function AddClientModal({ isOpen, onClose, client, mode = 'new', onSuccess }: AddClientModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -63,6 +75,17 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new' }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (mode === 'new') {
+      onSuccess?.({
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || undefined,
+        documentNumber: formData.documentNumber || undefined,
+        address: formData.address || undefined,
+        leadSource: formData.leadSource || undefined,
+        notes: formData.notes || undefined,
+      })
+    }
     alert(mode === 'update' ? 'Client updated successfully! (Static UI)' : 'Client created successfully! (Static UI)')
     onClose()
     if (mode === 'new') {
