@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiEdit, FiMoreVertical, FiPlus, FiChevronLeft, FiMail, FiMapPin, FiUser, FiFileText, FiUpload } from 'react-icons/fi'
+import { FiEdit, FiMoreVertical, FiPlus, FiChevronLeft, FiMail, FiUser, FiFileText, FiUpload } from 'react-icons/fi'
 import { mockClients, mockWorkorders } from '@/data/mockData'
 import AddWorkorderModal from './AddWorkorderModal'
 
@@ -147,6 +147,18 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                 >
                   Create Task
                 </button>
+                <button
+                  onClick={() => {
+                    setIsMoreActionsOpen(false)
+                    alert('Archive client (Static UI – not implemented)')
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-t"
+                  style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  Archived Client
+                </button>
               </div>
             )}
           </div>
@@ -157,62 +169,6 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
       <div className="flex flex-col lg:flex-row gap-3">
         {/* Left Column - Main Content */}
         <div className="flex-1 space-y-3">
-          {/* Properties Section */}
-          <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
-            <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-base font-bold" style={{ color: '#1F271B' }}>Properties</h2>
-              <button
-                className="px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-                style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1E8A8B'
-                  e.currentTarget.style.transform = 'translateY(-1px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#28AFB0'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                <FiPlus size={12} />
-                <span>New Property</span>
-              </button>
-            </div>
-            {client.address ? (
-              <div className="flex items-start gap-2 p-2.5 rounded" style={{ backgroundColor: '#F3F4F6' }}>
-                <FiMapPin size={16} style={{ color: '#28AFB0', marginTop: '2px' }} />
-                <div className="flex-1">
-                  <p className="text-xs" style={{ color: '#1F271B' }}>{client.address}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs py-2" style={{ color: '#1F271B', opacity: 0.6 }}>No properties added</p>
-            )}
-          </div>
-
-          {/* Contacts Section */}
-          <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
-            <h2 className="text-base font-bold mb-2.5" style={{ color: '#1F271B' }}>Contacts</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr style={{ backgroundColor: '#F3F4F6' }}>
-                    <th className="px-2 py-1.5 text-left text-[10px] font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Name</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Role</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Phone</th>
-                    <th className="px-2 py-1.5 text-left text-[10px] font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Email</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td colSpan={4} className="px-2 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-                      No contacts found
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           {/* Overview Section */}
           <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
             <div className="flex items-center justify-between mb-2.5">

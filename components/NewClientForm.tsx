@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiSave, FiChevronLeft, FiX } from 'react-icons/fi'
-import { format } from 'date-fns'
+import { FiSave, FiChevronLeft } from 'react-icons/fi'
 
 export default function NewClientForm() {
   const router = useRouter()
@@ -15,8 +14,6 @@ export default function NewClientForm() {
     documentNumber: '',
     leadSource: '',
     notes: '',
-    lastActivity: format(new Date(), 'MMM d, yyyy'),
-    status: 'Active',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,10 +55,10 @@ export default function NewClientForm() {
       {/* Form */}
       <div className="bg-white rounded shadow-sm border p-3 max-w-2xl mx-auto" style={{ borderColor: '#EAEBED' }}>
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Unique Identifier */}
+          {/* Unique Identifier - for internal purposes only, not shown elsewhere */}
           <div>
             <label className="block text-[10px] font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-              Unique Identifier
+              Unique Identifier <span className="font-normal opacity-70">(For internal purposes only)</span>
             </label>
             <input
               type="text"
@@ -234,55 +231,6 @@ export default function NewClientForm() {
                 e.currentTarget.style.boxShadow = 'none'
               }}
             />
-          </div>
-
-          {/* Last Activity */}
-          <div>
-            <label className="block text-[10px] font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-              Last Activity
-            </label>
-            <input
-              type="text"
-              name="lastActivity"
-              value={formData.lastActivity}
-              onChange={handleChange}
-              placeholder="e.g., 27 minutes ago"
-              className="w-full px-2.5 py-1 border rounded focus:outline-none focus:ring-2 text-xs transition-all"
-              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#28AFB0'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#EAEBED'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-[10px] font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-              Status
-            </label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="w-full px-2.5 py-1 border rounded focus:outline-none focus:ring-2 text-xs transition-all"
-              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#28AFB0'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#EAEBED'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            >
-              <option value="Active">Active</option>
-              <option value="Archived">Archived</option>
-            </select>
           </div>
 
           {/* Actions */}

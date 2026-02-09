@@ -90,10 +90,10 @@ export default function EditClientForm({ clientId }: EditClientFormProps) {
       {/* Form */}
       <div className="bg-white rounded shadow-sm border p-3 max-w-2xl mx-auto" style={{ borderColor: '#EAEBED' }}>
         <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Unique Identifier */}
+          {/* Unique Identifier - for internal purposes only, not shown elsewhere */}
           <div>
             <label className="block text-[10px] font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-              Unique Identifier
+              Unique Identifier <span className="font-normal opacity-70">(For internal purposes only)</span>
             </label>
             <input
               type="text"

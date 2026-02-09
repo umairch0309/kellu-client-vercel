@@ -105,12 +105,12 @@ export default function Dashboard() {
     }
   ], [quoteStats, jobStats, invoiceStats, requiresInvoicing, actionRequired])
 
-  // Get today's appointments
+  // Today's appointments: use a fixed date so the same appointments always show (static for demo)
+  const STATIC_APPOINTMENTS_DATE = '2026-02-05'
   const todayAppointments = useMemo(() => {
-    const today = format(new Date(), 'yyyy-MM-dd')
     return mockWorkorders.filter(wo => {
       const scheduleDate = wo.schedule?.day
-      return scheduleDate && scheduleDate === today
+      return scheduleDate && scheduleDate === STATIC_APPOINTMENTS_DATE
     })
   }, [])
 

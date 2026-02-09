@@ -42,7 +42,7 @@ export default function WorkordersList() {
   const filteredWorkorders = mockWorkorders.filter(wo => {
     const matchesSearch = wo.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          wo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         wo.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (wo.address && wo.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          `#${wo.id}`.includes(searchTerm)
     
     const matchesQuote = quoteStatusFilter === 'all' || wo.quoteStatus === quoteStatusFilter
@@ -51,6 +51,15 @@ export default function WorkordersList() {
     
     return matchesSearch && matchesQuote && matchesJob && matchesInvoice
   })
+
+  const hasActiveFilters = searchTerm !== '' || quoteStatusFilter !== 'all' || jobStatusFilter !== 'all' || invoiceStatusFilter !== 'all'
+
+  const clearAllFilters = () => {
+    setSearchTerm('')
+    setQuoteStatusFilter('all')
+    setJobStatusFilter('all')
+    setInvoiceStatusFilter('all')
+  }
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -126,103 +135,94 @@ export default function WorkordersList() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Quote Status Block */}
         <div 
-          className="rounded shadow-sm border overflow-hidden cursor-pointer transition-all hover:shadow-md"
+          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          onClick={() => setIsQuoteDropdownOpen(!isQuoteDropdownOpen)}
         >
           <div className="h-0.5" style={{ backgroundColor: '#B084CC' }}></div>
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Quote Status</p>
-              </div>
-              <FiChevronRight size={12} className="transition-transform" style={{ color: '#1F271B', opacity: 0.5 }} />
+              <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Quote Status</p>
+              <FiChevronRight size={12} style={{ color: '#1F271B', opacity: 0.5 }} />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Not Sent</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{quoteStats['not sent']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Waiting for Approval</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{quoteStats['waiting for approval']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Approved</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{quoteStats['approved']}</span>
-              </div>
+              {(['not sent', 'waiting for approval', 'approved'] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setQuoteStatusFilter(quoteStatusFilter === status ? 'all' : status) }}
+                  className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
+                  style={{ backgroundColor: quoteStatusFilter === status ? 'rgba(176, 132, 204, 0.15)' : 'transparent' }}
+                >
+                  <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
+                    {status === 'not sent' ? 'Not Sent' : status === 'waiting for approval' ? 'Waiting for Approval' : 'Approved'}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{quoteStats[status]}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Job Status Block */}
         <div 
-          className="rounded shadow-sm border overflow-hidden cursor-pointer transition-all hover:shadow-md"
+          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          onClick={() => setIsJobDropdownOpen(!isJobDropdownOpen)}
         >
           <div className="h-0.5" style={{ backgroundColor: '#2B50AA' }}></div>
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Job Status</p>
-              </div>
-              <FiChevronRight size={12} className="transition-transform" style={{ color: '#1F271B', opacity: 0.5 }} />
+              <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Job Status</p>
+              <FiChevronRight size={12} style={{ color: '#1F271B', opacity: 0.5 }} />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Unscheduled</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats['Unscheduled']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Scheduled</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats['Scheduled']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>In Progress</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats['In Progress']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Completed</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats['Completed']}</span>
-              </div>
+              {(['Unscheduled', 'Scheduled', 'In Progress', 'Completed'] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setJobStatusFilter(jobStatusFilter === status ? 'all' : status) }}
+                  className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
+                  style={{ backgroundColor: jobStatusFilter === status ? 'rgba(43, 80, 170, 0.12)' : 'transparent' }}
+                >
+                  <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>{status}</span>
+                  <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats[status]}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Invoice Status Block */}
         <div 
-          className="rounded shadow-sm border overflow-hidden cursor-pointer transition-all hover:shadow-md"
+          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          onClick={() => setIsInvoiceDropdownOpen(!isInvoiceDropdownOpen)}
         >
           <div className="h-0.5" style={{ backgroundColor: '#28AFB0' }}></div>
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Invoice Status</p>
-              </div>
-              <FiChevronRight size={12} className="transition-transform" style={{ color: '#1F271B', opacity: 0.5 }} />
+              <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Invoice Status</p>
+              <FiChevronRight size={12} style={{ color: '#1F271B', opacity: 0.5 }} />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Not Sent</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{invoiceStats['not sent']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Waiting for Payment</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{invoiceStats['waiting for payment']}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Paid</span>
-                <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{invoiceStats['paid']}</span>
-              </div>
+              {(['not sent', 'waiting for payment', 'paid'] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setInvoiceStatusFilter(invoiceStatusFilter === status ? 'all' : status) }}
+                  className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
+                  style={{ backgroundColor: invoiceStatusFilter === status ? 'rgba(40, 175, 176, 0.12)' : 'transparent' }}
+                >
+                  <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
+                    {status === 'not sent' ? 'Not Sent' : status === 'waiting for payment' ? 'Waiting for Payment' : 'Paid'}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{invoiceStats[status]}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -233,6 +233,16 @@ export default function WorkordersList() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
           <h2 className="text-base font-bold" style={{ color: '#1F271B' }}>All workorders ({filteredWorkorders.length} result{filteredWorkorders.length !== 1 ? 's' : ''})</h2>
           <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end flex-wrap">
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-medium hover:underline px-1"
+                style={{ color: '#28AFB0' }}
+              >
+                Clear filters
+              </button>
+            )}
             {/* Quote Status Filter */}
             <div className="relative" ref={quoteDropdownRef}>
               <button
@@ -522,12 +532,13 @@ export default function WorkordersList() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Job status</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Invoice status</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Total</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Last modified</th>
               </tr>
             </thead>
             <tbody>
               {filteredWorkorders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                  <td colSpan={9} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
                     No workorders found
                   </td>
                 </tr>
@@ -578,6 +589,13 @@ export default function WorkordersList() {
                       </td>
                       <td className="px-3 py-2">
                         <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Rs {workorder.total.toFixed(2)}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
+                          {(workorder as { lastModified?: string }).lastModified
+                            ? format(new Date((workorder as { lastModified: string }).lastModified), 'MMM d, yyyy')
+                            : '—'}
+                        </p>
                       </td>
                     </tr>
                   )
