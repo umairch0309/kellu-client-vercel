@@ -1,15 +1,14 @@
 'use client'
 
-import Layout from '@/components/Layout'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import NewClientForm from '@/components/NewClientForm'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function NewClientPage() {
-  return (
-    <ProtectedRoute>
-      <Layout>
-        <NewClientForm />
-      </Layout>
-    </ProtectedRoute>
-  )
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace('/clients?new=1')
+  }, [router])
+
+  return null
 }

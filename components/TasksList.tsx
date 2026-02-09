@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiCheckCircle, FiClock } from 'react-icons/fi'
+import NewTaskModal from './NewTaskModal'
 
-const mockTasks = [
+const initialMockTasks = [
   {
     id: 1,
     title: 'Follow-up Call',
@@ -36,8 +37,10 @@ const mockTasks = [
 export default function TasksList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false)
+  const [tasks, setTasks] = useState(initialMockTasks)
 
-  const filteredTasks = mockTasks.filter(task => {
+  const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.clientName.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || task.status.toLowerCase().replace(' ', '-') === statusFilter
@@ -48,7 +51,13 @@ export default function TasksList() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl md:text-3xl font-bold text-neutral-dark">Tasks</h1>
-        <button className="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary-dark transition-colors flex items-center gap-2">
+        <button
+          onClick={() => setIsNewTaskModalOpen(true)}
+          className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+          style={{ backgroundColor: '#28AFB0', color: 'white' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
+        >
           <FiPlus size={18} />
           <span>New Task</span>
         </button>
@@ -174,6 +183,23 @@ export default function TasksList() {
           </table>
         </div>
       </div>
+
+      <NewTaskModal
+        isOpen={isNewTaskModalOpen}
+        onClose={() => setIsNewTaskModalOpen(false)}
+        onSave={(task) => {
+          setTasks(prev => [...prev, {
+            id: Math.max(0, ...prev.map(t => t.id)) + 1,
+            title: task.title,
+            clientName: task.clientName || '—',
+            assignedTo: task.assignedTo || 'Unassigned',
+            dueDate: task.startDate,
+            status: 'Pending',
+            priority: 'Medium',
+          }])
+          setIsNewTaskModalOpen(false)
+        }}
+      />
     </div>
   )
 }

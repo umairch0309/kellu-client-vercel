@@ -89,7 +89,7 @@ export default function SettingsView() {
                     <label className="block text-sm font-medium text-neutral-dark mb-2">Default Tax Rate (%)</label>
                     <input
                       type="number"
-                      defaultValue="10"
+                      defaultValue="19"
                       className="w-full px-4 py-2 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>

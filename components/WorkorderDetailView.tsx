@@ -21,14 +21,14 @@ import {
   FiDollarSign,
   FiLink,
   FiCreditCard,
-  FiTool,
-  FiCopy,
   FiSend,
-  FiPrinter,
-  FiDownload
+  FiTrash2
 } from 'react-icons/fi'
 import { format } from 'date-fns'
-import { mockClients, mockWorkorders } from '@/data/mockData'
+import { mockClients, mockWorkorders, mockMaterialsList, companyTaxRatePercent, quoteSettings, invoiceSettings } from '@/data/mockData'
+import AddProductServiceModal, { type NewProductServiceData } from './AddProductServiceModal'
+import SendEmailModal, { type SendEmailModalType } from './SendEmailModal'
+import CreateJobReportModal from './CreateJobReportModal'
 
 interface WorkorderDetailViewProps {
   workorderId: number
@@ -38,7 +38,6 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const router = useRouter()
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
   const [isAddLineItemOpen, setIsAddLineItemOpen] = useState(false)
-  const [selectedInvoiceTab, setSelectedInvoiceTab] = useState('Billing')
   const [internalNote, setInternalNote] = useState('')
   const [showProfitability, setShowProfitability] = useState(true)
   const [newLineItem, setNewLineItem] = useState({
@@ -49,6 +48,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
     unitCost: 0,
   })
   const [lineItemError, setLineItemError] = useState('')
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [editingLineItemIndex, setEditingLineItemIndex] = useState<number | null>(null)
   const [editedLineItems, setEditedLineItems] = useState<any[]>([])
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
@@ -71,25 +73,35 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
     reference: '',
     notes: '',
   })
+  const [quoteClientMessage, setQuoteClientMessage] = useState(() => quoteSettings?.clientMessage ?? '')
+  const [quoteTermsAndConditions, setQuoteTermsAndConditions] = useState(() => quoteSettings?.termsAndConditions ?? '')
+  const [applyToAllFutureQuotes, setApplyToAllFutureQuotes] = useState(false)
+  const [invoiceClientMessage, setInvoiceClientMessage] = useState(() => invoiceSettings?.clientMessage ?? '')
+  const [invoiceTermsAndConditions, setInvoiceTermsAndConditions] = useState(() => invoiceSettings?.termsAndConditions ?? '')
+  const [applyToAllFutureInvoices, setApplyToAllFutureInvoices] = useState(false)
+  const [invoiceInternalNote, setInvoiceInternalNote] = useState('')
+  const [sendEmailModalType, setSendEmailModalType] = useState<SendEmailModalType | null>(null)
+  const [jobReportPdfUrl, setJobReportPdfUrl] = useState<string | null>(null)
+  const [jobReportSentAt, setJobReportSentAt] = useState<string | null>(null)
+  const [isCreateJobReportModalOpen, setIsCreateJobReportModalOpen] = useState(false)
   const moreActionsRef = useRef<HTMLDivElement>(null)
-
-  // Mock master price list / services
-  const masterServices = [
-    { id: 1, name: 'Free Assessment', description: 'Our experts will come to assess your needs and discuss solutions', unitPrice: 0, unitCost: 0 },
-    { id: 2, name: 'Exterior Window Cleaning', description: 'Includes cleaning of all exterior windows, frames, and sills.', unitPrice: 0, unitCost: 0 },
-    { id: 3, name: 'Interior Window Cleaning', description: 'Cleaning of all interior windows including frames and sills by hand washing.', unitPrice: 0, unitCost: 0 },
-    { id: 4, name: 'Plumbing Repair', description: 'General plumbing repair and maintenance services', unitPrice: 150, unitCost: 50 },
-    { id: 5, name: 'HVAC Maintenance', description: 'Annual HVAC system maintenance and inspection', unitPrice: 320, unitCost: 100 },
-  ]
+  const lineItemNameDropdownRef = useRef<HTMLDivElement>(null)
 
   const workorder = mockWorkorders.find(wo => wo.id === workorderId)
   const client = workorder ? mockClients.find(c => c.id === workorder.clientId) : null
 
   useEffect(() => {
-    if (workorder) {
-      setEditedLineItems([...workorder.lineItems])
-      setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
-    }
+    if (!workorder) return
+    setEditedLineItems([...workorder.lineItems])
+    setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
+    setQuoteClientMessage((workorder as any).quoteClientMessage ?? quoteSettings?.clientMessage ?? '')
+    setQuoteTermsAndConditions((workorder as any).quoteTermsAndConditions ?? quoteSettings?.termsAndConditions ?? '')
+    setInvoiceClientMessage((workorder as any).invoiceClientMessage ?? invoiceSettings?.clientMessage ?? '')
+    setInvoiceTermsAndConditions((workorder as any).invoiceTermsAndConditions ?? invoiceSettings?.termsAndConditions ?? '')
+    setJobReportPdfUrl((workorder as any).jobReportPdfUrl ?? null)
+    setJobReportSentAt((workorder as any).jobReportSentAt ?? null)
+    setInternalNote((workorder as any).internalNote ?? '')
+    setInvoiceInternalNote((workorder as any).invoiceInternalNote ?? '')
   }, [workorder])
 
   useEffect(() => {
@@ -119,9 +131,11 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const totalExpenses = Array.isArray(workorder.expenses) && workorder.expenses.length > 0 
     ? (workorder.expenses as any[]).reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0) 
     : 0
-  const totalCost = totalLineItemCost + totalExpenses
+  const totalLabor = (workorder as any).labor ?? 0
+  const totalCost = totalLineItemCost + totalLabor + totalExpenses
   const profit = totalLineItemPrice - totalCost
   const profitMargin = totalLineItemPrice > 0 ? ((profit / totalLineItemPrice) * 100).toFixed(0) : '0'
+  const legendSquareStyle = { width: 8, height: 8, backgroundColor: '#7DD3FC', borderRadius: 1 }
   
   // Calculate total payments
   const totalPayments = editedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
@@ -178,84 +192,50 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <FiMoreVertical size={12} />
             </button>
             {isMoreActionsOpen && (
-              <div className="absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[240px]" style={{ borderColor: '#EAEBED' }}>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiTool size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
-                  <span>Close Job</span>
-                </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiCopy size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Create Similar Job</span>
-                </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiSend size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Send Job Follow-up Email</span>
-                </button>
-                <button 
+              <div className="absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[220px]" style={{ borderColor: '#EAEBED' }}>
+                <button
                   onClick={() => {
-                    router.push(`/workorders/${workorderId}/send-invoice`)
+                    setSendEmailModalType('quote')
                     setIsMoreActionsOpen(false)
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiDollarSign size={16} style={{ color: '#2B50AA', flexShrink: 0 }} />
-                  <span>Create Invoice</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    router.push(`/workorders/${workorderId}/send-quote`)
-                    setIsMoreActionsOpen(false)
-                  }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
                   style={{ color: '#1F271B' }}
                 >
                   <FiSend size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
                   <span>Send Quote</span>
                 </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
+                <button
+                  onClick={() => {
+                    setSendEmailModalType('invoice')
+                    setIsMoreActionsOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
                   style={{ color: '#1F271B' }}
                 >
-                  <FiEdit size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Collect Signature</span>
+                  <FiDollarSign size={16} style={{ color: '#2B50AA', flexShrink: 0 }} />
+                  <span>Send Invoice</span>
                 </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
+                <button
+                  onClick={() => {
+                    setSendEmailModalType('job-follow')
+                    setIsMoreActionsOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
                   style={{ color: '#1F271B' }}
                 >
-                  <FiFileText size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
-                  <span>Email Job Costs CSV</span>
+                  <FiMail size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
+                  <span>Send Job Follow (NEW)</span>
                 </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
+                <button
+                  onClick={() => {
+                    setIsCreateJobReportModalOpen(true)
+                    setIsMoreActionsOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
                   style={{ color: '#1F271B' }}
                 >
-                  <FiFileText size={16} style={{ color: '#DC2626', flexShrink: 0 }} />
-                  <span>Download PDF</span>
-                </button>
-                <button 
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiPrinter size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Print</span>
-                </button>
-                <div className="border-t my-1" style={{ borderTopColor: '#EAEBED' }}></div>
-                <button className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors" style={{ color: '#1F271B' }}>
-                  Archive
-                </button>
-                <button className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors" style={{ color: '#1F271B' }}>
-                  Delete
+                  <FiFileText size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
+                  <span>Create Job report</span>
                 </button>
               </div>
             )}
@@ -394,94 +374,119 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 )}
               </div>
 
-              {/* Job Details */}
-              <div className="pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Job type:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>One-off job</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Starts on:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>{format(new Date(workorder.schedule.day), 'MMM dd, yyyy')}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Ends on:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>{format(new Date(workorder.schedule.day), 'MMM dd, yyyy')}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Billing frequency:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>Upon job completion</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Salesperson:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>—</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Created at:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>{format(new Date(workorder.createdAt), 'MMM dd, yyyy')}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Last modified:</p>
-                    <p className="text-sm" style={{ color: '#1F271B' }}>{format(new Date(workorder.lastModified), 'MMM dd, yyyy')}</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Profitability Summary Section */}
-          {showProfitability && (
-            <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
-              <div className="flex items-center justify-between mb-3">
+          {/* Work order Report (Job Form) */}
+          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Work order Report (Job Form)</h2>
+            {!jobReportPdfUrl ? (
+              <div className="flex flex-col sm:flex-row items-start gap-3">
+                <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
+                  Create a job report with photos, notes, and digital signature. PDF is stored here and can be sent to the customer.
+                </p>
                 <button
-                  onClick={() => setShowProfitability(false)}
-                  className="text-xs font-medium flex items-center gap-1 transition-colors"
-                  style={{ color: '#1F271B', opacity: 0.7 }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '1'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '0.7'
-                  }}
+                  onClick={() => setIsCreateJobReportModalOpen(true)}
+                  className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 shrink-0"
+                  style={{ backgroundColor: '#28AFB0', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
                 >
-                  Hide Profitability
-                  <FiChevronUp size={12} />
+                  <FiFileText size={14} />
+                  Create Job report
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
-                    {profit < 0 ? '-' : ''}{profitMargin}%
-                  </p>
-                  <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={jobReportPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium"
+                    style={{ color: '#28AFB0' }}
+                  >
+                    <FiFileText size={16} />
+                    View PDF
+                  </a>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span style={{ color: '#1F271B', opacity: 0.7 }}>Total price:</span>
-                    <span className="font-medium" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</span>
+                <button
+                  onClick={() => setSendEmailModalType('work-order-report')}
+                  className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5"
+                  style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F0FDFA' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
+                >
+                  <FiMail size={14} />
+                  {jobReportSentAt ? 'Resend work order report' : 'Send work order report'}
+                </button>
+                {jobReportSentAt && (
+                  <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                    Sent {format(new Date(jobReportSentAt), 'MMM dd, yyyy')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Grouped: Profitability + Line Items + Expenses — grey outer, white div per section */}
+          <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
+            {/* Profitability Section — white card */}
+            {showProfitability && (
+              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => setShowProfitability(false)}
+                    className="text-xs font-medium flex items-center gap-1 transition-colors"
+                    style={{ color: '#1F271B', opacity: 0.7 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
+                  >
+                    Hide Profitability
+                    <FiChevronUp size={12} />
+                  </button>
+                </div>
+                <div className="border-b pb-4 mb-4" style={{ borderColor: '#EAEBED' }} />
+                <div className="flex flex-wrap items-start gap-6 md:gap-8">
+                  <div>
+                    <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
+                      {profit < 0 ? '-' : ''}{profitMargin}%
+                    </p>
+                    <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span style={{ color: '#1F271B', opacity: 0.7 }}>Line Item Cost:</span>
-                    <span className="font-medium" style={{ color: '#1F271B' }}>Rs{totalLineItemCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span style={{ color: '#1F271B', opacity: 0.7 }}>Expenses:</span>
-                    <span className="font-medium" style={{ color: '#1F271B' }}>Rs{totalExpenses.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-1 border-t" style={{ borderTopColor: '#EAEBED' }}>
-                    <span className="font-medium" style={{ color: '#1F271B' }}>Profit:</span>
-                    <span className="font-bold" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
-                      = {profit < 0 ? '-' : ''}Rs{Math.abs(profit).toFixed(2)}
-                    </span>
+                  <div className="flex flex-wrap gap-6 md:gap-8">
+                    <div>
+                      <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Total price</p>
+                      <p className="text-sm font-bold" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                      <div>
+                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Line Item Cost</p>
+                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalLineItemCost.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                      <div>
+                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Labor</p>
+                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalLabor.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                      <div>
+                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Expenses</p>
+                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalExpenses.toFixed(2)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Line Items Section */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+            {/* Line Items Section — white card */}
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Line Items</h2>
               <button
@@ -502,183 +507,135 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 }}
               >
                 <FiPlus size={12} />
-                <span>New Line Item</span>
+                <span>Add Line Item</span>
               </button>
             </div>
 
-            {/* Add New Line Item Form - Inline */}
+            {/* Add New Line Item Form - Jobber-style: Name with materials dropdown, Description below, no Service box */}
             {isAddLineItemOpen && (
-              <div className="mb-4 p-4 border rounded-lg" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }}>
-                {/* Top Row - Name Field and Quantity/Price Fields */}
-                <div className="mb-3">
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newLineItem.name}
-                    onChange={(e) => {
-                      setNewLineItem({ ...newLineItem, name: e.target.value })
-                      setLineItemError('')
-                    }}
-                    placeholder="Enter line item name"
-                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all ${
-                      lineItemError ? 'border-red-500' : ''
-                    }`}
-                    style={{ 
-                      borderColor: lineItemError ? '#DC2626' : '#EAEBED', 
-                      color: '#1F271B' 
-                    }}
-                    required
-                    onFocus={(e) => {
-                      if (!lineItemError) {
-                        e.currentTarget.style.borderColor = '#28AFB0'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (!lineItemError) {
-                        e.currentTarget.style.borderColor = '#EAEBED'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }
-                    }}
-                  />
-                  {lineItemError && (
-                    <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#DC2626' }}>
-                      <FiInfo size={12} />
-                      {lineItemError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Quantity, Unit Cost, Unit Price, Total */}
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>Quantity</label>
+              <div ref={lineItemNameDropdownRef} className="mb-4 p-4 border rounded-lg" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }}>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Name <span className="text-red-500">*</span></label>
                     <input
-                      type="number"
-                      value={newLineItem.quantity}
+                      type="text"
+                      value={newLineItem.name}
                       onChange={(e) => {
-                        const qty = parseFloat(e.target.value) || 0
-                        setNewLineItem({ ...newLineItem, quantity: qty })
+                        setNewLineItem({ ...newLineItem, name: e.target.value })
+                        setLineItemError('')
                       }}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-2 py-2 border rounded text-sm text-center"
-                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>Unit cost</label>
-                    <input
-                      type="number"
-                      value={newLineItem.unitCost}
-                      onChange={(e) => {
-                        const cost = parseFloat(e.target.value) || 0
-                        setNewLineItem({ ...newLineItem, unitCost: cost })
+                      placeholder="Type to search materials..."
+                      className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all ${lineItemError ? 'border-red-500' : ''}`}
+                      style={{ borderColor: lineItemError ? '#DC2626' : '#EAEBED', color: '#1F271B' }}
+                      onFocus={(e) => {
+                        if (!lineItemError) { e.currentTarget.style.borderColor = '#28AFB0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)' }
                       }}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-2 py-2 border rounded text-sm text-center"
-                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>Unit price</label>
-                    <input
-                      type="number"
-                      value={newLineItem.unitPrice}
-                      onChange={(e) => {
-                        const price = parseFloat(e.target.value) || 0
-                        setNewLineItem({ ...newLineItem, unitPrice: price })
+                      onBlur={(e) => {
+                        if (!lineItemError) { e.currentTarget.style.borderColor = '#EAEBED'; e.currentTarget.style.boxShadow = 'none' }
                       }}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-2 py-2 border rounded text-sm text-center"
-                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                     />
+                    {lineItemError && (
+                      <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#DC2626' }}><FiInfo size={12} />{lineItemError}</p>
+                    )}
+                    {(() => {
+                      const filtered = mockMaterialsList.filter(m => m.name.toLowerCase().includes((newLineItem.name || '').toLowerCase()))
+                      const hasExactMatch = filtered.some(m => m.name.toLowerCase() === (newLineItem.name || '').trim().toLowerCase())
+                      const showCreateNew = (newLineItem.name || '').trim() !== '' && (filtered.length === 0 || !hasExactMatch)
+                      const showDropdown = filtered.length > 0 || showCreateNew
+                      if (!showDropdown || (newLineItem.name || '').trim() === '') return null
+                      return (
+                        <div className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto" style={{ borderColor: '#EAEBED' }}>
+                          {filtered.slice(0, 8).map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setNewLineItem({ ...newLineItem, name: m.name, description: m.description || '', unitPrice: m.unitPrice })
+                                setLineItemError('')
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b last:border-b-0"
+                              style={{ color: '#1F271B', borderColor: '#EAEBED' }}
+                            >
+                              <span className="font-medium">{m.name}</span>
+                              {m.unitPrice > 0 && <span className="text-xs ml-2 opacity-70">Rs{m.unitPrice.toFixed(2)}</span>}
+                            </button>
+                          ))}
+                          {showCreateNew && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddProductModalOpen(true)
+                              }}
+                              className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 font-medium border-t"
+                              style={{ color: '#28AFB0', borderColor: '#EAEBED' }}
+                            >
+                              <FiPlus size={16} style={{ color: '#28AFB0' }} />
+                              Create new item
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>Total</label>
-                    <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                      Rs{(newLineItem.quantity * newLineItem.unitPrice).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Row - Service List and Description */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Left Column - Service List */}
-                  <div>
-                    <h3 className="text-xs font-semibold mb-2" style={{ color: '#1F271B' }}>SERVICE</h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {masterServices.map((service) => (
-                        <button
-                          key={service.id}
-                          onClick={() => {
-                            setNewLineItem({
-                              name: service.name,
-                              description: service.description,
-                              quantity: 1,
-                              unitPrice: service.unitPrice,
-                              unitCost: service.unitCost,
-                            })
-                            setLineItemError('')
-                          }}
-                          className="w-full text-left p-2 rounded border transition-all"
-                          style={{ 
-                            borderColor: '#EAEBED',
-                            backgroundColor: newLineItem.name === service.name ? '#FEF3C7' : 'white'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (newLineItem.name !== service.name) {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6'
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (newLineItem.name !== service.name) {
-                              e.currentTarget.style.backgroundColor = 'white'
-                            }
-                          }}
-                        >
-                          <p className="text-xs font-medium mb-1" style={{ color: '#1F271B' }}>{service.name}</p>
-                          <p className="text-[10px] mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>{service.description}</p>
-                          <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Rs{service.unitPrice.toFixed(2)}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right Column - Description */}
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Description</label>
                     <textarea
                       value={newLineItem.description}
                       onChange={(e) => setNewLineItem({ ...newLineItem, description: e.target.value })}
                       placeholder="Enter description"
-                      rows={8}
+                      rows={3}
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
                       style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#28AFB0'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#EAEBED'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
                     />
                   </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quantity</label>
+                      <input
+                        type="number"
+                        value={newLineItem.quantity}
+                        onChange={(e) => setNewLineItem({ ...newLineItem, quantity: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit cost</label>
+                      <input
+                        type="number"
+                        value={newLineItem.unitCost}
+                        onChange={(e) => setNewLineItem({ ...newLineItem, unitCost: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit price</label>
+                      <input
+                        type="number"
+                        value={newLineItem.unitPrice}
+                        onChange={(e) => setNewLineItem({ ...newLineItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Total</label>
+                      <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                        Rs{(newLineItem.quantity * newLineItem.unitPrice).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-
-                {/* Action Buttons */}
                 <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
                   <button
-                    onClick={() => {
-                      setIsAddLineItemOpen(false)
-                      setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 })
-                      setLineItemError('')
-                    }}
+                    onClick={() => { setIsAddLineItemOpen(false); setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 }); setLineItemError('') }}
                     className="px-3 py-1.5 border rounded text-xs font-medium transition-all"
                     style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
                   >
@@ -686,11 +643,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   </button>
                   <button
                     onClick={() => {
-                      if (!newLineItem.name.trim()) {
-                        setLineItemError('Enter a line item name')
-                        return
-                      }
-                      // In a real app, this would save to the database
+                      if (!newLineItem.name.trim()) { setLineItemError('Enter a line item name'); return }
                       alert('Line item added successfully! (Static UI)')
                       setIsAddLineItemOpen(false)
                       setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 })
@@ -722,27 +675,17 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                           <span style={{ color: '#1F271B', opacity: 0.7 }}>Total: <span className="font-semibold">Rs{item.total.toFixed(2)}</span></span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="text-xs underline transition-colors"
-                          style={{ color: '#DC2626' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.8'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1'
-                          }}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all"
-                          style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                        >
-                          <FiCheckCircle size={12} />
-                          <span>Save</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditedLineItems(editedLineItems.filter((_, i) => i !== index))}
+                        className="p-2 rounded transition-colors"
+                        style={{ color: '#1F271B', opacity: 0.7 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#FEE2E2' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                        title="Delete line"
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -780,26 +723,31 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                         <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
                         <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2)}</td>
                       </tr>
-                      {workorder.discount > 0 && (
-                        <tr>
-                          <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>
-                            Discount ({workorder.discountType === 'percentage' ? `${workorder.discount}%` : 'Amount'})
-                          </td>
+                      <tr>
+                        <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>
+                          Discount{workorder.discount > 0 ? ` (${workorder.discountType === 'percentage' ? `${workorder.discount}%` : 'Amount'})` : ''}
+                        </td>
+                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
+                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
+                          {workorder.discount > 0
+                            ? `-Rs${workorder.discountType === 'percentage'
+                                ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
+                                : workorder.discount.toFixed(2)}`
+                            : '—'}
+                        </td>
+                      </tr>
+                      <tr>
+                          <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Tax ({companyTaxRatePercent}%)</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
-                            -Rs{workorder.discountType === 'percentage' 
-                              ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
-                              : workorder.discount.toFixed(2)}
+                            Rs{(() => {
+                              const st = editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0)
+                              const disc = workorder.discount > 0 ? (workorder.discountType === 'percentage' ? (st * workorder.discount / 100) : workorder.discount) : 0
+                              const afterDisc = st - disc
+                              return (afterDisc * companyTaxRatePercent / 100).toFixed(2)
+                            })()}
                           </td>
                         </tr>
-                      )}
-                      {workorder.tax > 0 && (
-                        <tr>
-                          <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Tax</td>
-                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
-                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{workorder.tax.toFixed(2)}</td>
-                        </tr>
-                      )}
                       <tr className="font-bold border-t" style={{ borderTopColor: '#EAEBED' }}>
                         <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Total</td>
                         <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
@@ -810,161 +758,225 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 </div>
               </div>
             )}
+            </div>
+
+            {/* Expenses Section — white card */}
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Expenses</h2>
+                <button
+                  onClick={() => {
+                    setNewExpense({
+                      date: new Date().toISOString().split('T')[0],
+                      itemName: '',
+                      details: '',
+                      total: 0,
+                      linkedWorkorder: workorderId || null,
+                      invoiceNumber: '',
+                      attachment: null,
+                    })
+                    setIsAddExpenseOpen(true)
+                  }}
+                  className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
+                  style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F0FDFA'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  <FiPlus size={12} />
+                  <span>New Expense</span>
+                </button>
+              </div>
+              <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>
+                Get an accurate picture of various job costs by recording expenses
+              </p>
+            </div>
           </div>
 
-          {/* Expenses Section */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Expenses</h2>
-              <button
-                onClick={() => {
-                  setNewExpense({
-                    date: new Date().toISOString().split('T')[0],
-                    itemName: '',
-                    details: '',
-                    total: 0,
-                    linkedWorkorder: workorderId || null,
-                    invoiceNumber: '',
-                    attachment: null,
-                  })
-                  setIsAddExpenseOpen(true)
+          {/* Quote Section - grouped with grey background, main heading "Quote", above Invoices */}
+          <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
+            <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Quote</h2>
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Client message</h3>
+              <textarea
+                value={quoteClientMessage}
+                onChange={(e) => setQuoteClientMessage(e.target.value)}
+                placeholder="Description"
+                rows={4}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#28AFB0'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
                 }}
-                className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
-                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F0FDFA'
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#EAEBED'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white'
-                }}
-              >
-                <FiPlus size={12} />
-                <span>New Expense</span>
-              </button>
+              />
             </div>
-            <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>
-              Get an accurate picture of various job costs by recording expenses
-            </p>
-          </div>
-
-          {/* Visits Section */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Visits</h2>
-              <button
-                className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 transition-all"
-                style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1E8A8B'
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Contract / Disclaimer</h3>
+              <textarea
+                value={quoteTermsAndConditions}
+                onChange={(e) => setQuoteTermsAndConditions(e.target.value)}
+                placeholder="Description"
+                rows={4}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#28AFB0'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#28AFB0'
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#EAEBED'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
-              >
-                <FiPlus size={12} />
-                <span>New Visit</span>
-              </button>
-            </div>
-            <p className="text-xs mb-2" style={{ color: '#F97316' }}>All day / Any time</p>
-            <div className="flex items-start gap-2 p-2 rounded" style={{ backgroundColor: '#F3F4F6' }}>
-              <input type="checkbox" className="mt-0.5" style={{ accentColor: '#28AFB0' }} />
-              <div>
-                <p className="text-xs" style={{ color: '#1F271B' }}>
-                  {format(new Date(workorder.schedule.day), 'MMM dd, yyyy')}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>
-                  Assigned to {workorder.assignedTeamMember || '—'}
-                </p>
+              />
+              <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyToAllFutureQuotes}
+                  onChange={(e) => setApplyToAllFutureQuotes(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                  style={{ accentColor: '#28AFB0' }}
+                />
+                <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Apply to all future quotes</span>
+              </label>
+              <div className="flex justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (applyToAllFutureQuotes) {
+                      quoteSettings.termsAndConditions = quoteTermsAndConditions
+                      quoteSettings.clientMessage = quoteClientMessage
+                    }
+                    alert(applyToAllFutureQuotes
+                      ? 'Quote section saved. Defaults in Settings have been updated for all future quotes.'
+                      : 'Quote section saved for this workorder.')
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium text-white transition-colors"
+                  style={{ backgroundColor: '#28AFB0' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
+                >
+                  Save
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Invoices Section */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Invoices</h2>
-            <div className="flex gap-4 mb-3 border-b" style={{ borderBottomColor: '#EAEBED' }}>
-              <button
-                onClick={() => setSelectedInvoiceTab('Billing')}
-                className="pb-2 text-xs font-medium transition-colors"
-                style={{ 
-                  color: selectedInvoiceTab === 'Billing' ? '#28AFB0' : '#1F271B',
-                  opacity: selectedInvoiceTab === 'Billing' ? 1 : 0.7,
-                  borderBottom: selectedInvoiceTab === 'Billing' ? '2px solid #28AFB0' : '2px solid transparent',
-                  marginBottom: '-2px'
+          {/* Invoice Section - same pattern as Quote: grey background, Client message + Contract/Disclaimer, Apply to all future invoices */}
+          <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
+            <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Invoice</h2>
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Client message</h3>
+              <textarea
+                value={invoiceClientMessage}
+                onChange={(e) => setInvoiceClientMessage(e.target.value)}
+                placeholder="Description"
+                rows={4}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#28AFB0'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
                 }}
-              >
-                Billing
-              </button>
-              <button
-                onClick={() => setSelectedInvoiceTab('Reminders')}
-                className="pb-2 text-xs font-medium transition-colors"
-                style={{ 
-                  color: selectedInvoiceTab === 'Reminders' ? '#28AFB0' : '#1F271B',
-                  opacity: selectedInvoiceTab === 'Reminders' ? 1 : 0.7,
-                  borderBottom: selectedInvoiceTab === 'Reminders' ? '2px solid #28AFB0' : '2px solid transparent',
-                  marginBottom: '-2px'
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#EAEBED'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
-              >
-                Reminders
-              </button>
+              />
             </div>
-            {selectedInvoiceTab === 'Billing' && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <input type="checkbox" id="split-invoices" className="w-4 h-4" style={{ accentColor: '#28AFB0' }} />
-                  <label htmlFor="split-invoices" className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
-                    Split into multiple invoices with a payment schedule
-                  </label>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>INVOICE</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>DUE DATE</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>STATUS</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>SUBJECT</th>
-                        <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>BALANCE</th>
-                        <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>TOTAL</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="py-2 px-2">
-                          <button
-                            className="px-2 py-1 rounded text-xs font-medium"
-                            style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                          >
-                            Create
-                          </button>
-                        </td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>—</td>
-                        <td className="py-2 px-2">
-                          <span className="inline-flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#60A5FA' }}></span>
-                            <span className="text-xs" style={{ color: '#1F271B' }}>Upcoming</span>
-                          </span>
-                        </td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>For Services Rendered</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Contract / Disclaimer</h3>
+              <textarea
+                value={invoiceTermsAndConditions}
+                onChange={(e) => setInvoiceTermsAndConditions(e.target.value)}
+                placeholder="Description"
+                rows={4}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#28AFB0'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#EAEBED'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+              <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={applyToAllFutureInvoices}
+                  onChange={(e) => setApplyToAllFutureInvoices(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                  style={{ accentColor: '#28AFB0' }}
+                />
+                <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Apply to all future invoices</span>
+              </label>
+              <div className="flex justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (applyToAllFutureInvoices) {
+                      invoiceSettings.termsAndConditions = invoiceTermsAndConditions
+                      invoiceSettings.clientMessage = invoiceClientMessage
+                    }
+                    const wo = mockWorkorders.find(w => w.id === workorderId)
+                    if (wo) {
+                      (wo as any).internalNote = internalNote
+                      (wo as any).invoiceInternalNote = invoiceInternalNote
+                    }
+                    alert(applyToAllFutureInvoices
+                      ? 'Invoice section saved. Defaults in Settings have been updated for all future invoices.'
+                      : 'Invoice section saved for this workorder.')
+                  }}
+                  className="px-4 py-2 rounded text-sm font-medium text-white transition-colors"
+                  style={{ backgroundColor: '#28AFB0' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
+                >
+                  Save
+                </button>
               </div>
-            )}
-            {selectedInvoiceTab === 'Reminders' && (
-              <div>
-                <p className="text-sm py-4 text-center" style={{ color: '#1F271B', opacity: 0.6 }}>
-                  Reminder tracking will be displayed here
-                </p>
-              </div>
-            )}
+            </div>
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Internal notes (invoice)</h3>
+              <p className="text-xs mb-2" style={{ color: '#1F271B', opacity: 0.6 }}>
+                Visible only to your team. Not sent to the client.
+              </p>
+              <textarea
+                value={invoiceInternalNote}
+                onChange={(e) => setInvoiceInternalNote(e.target.value)}
+                placeholder="e.g. payment terms, special instructions..."
+                rows={3}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#28AFB0'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#EAEBED'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Attachments (invoice)</h3>
+              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                Files added in the &quot;Attachments&quot; section above are included when you send this invoice to the client.
+              </p>
+            </div>
           </div>
 
           {/* Payments Section */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+          <div id="payments" className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Payments</h2>
               <button
@@ -1073,7 +1085,92 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             )}
           </div>
 
-          {/* Internal Notes Section */}
+          {/* Attachments Section - first */}
+          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Attachments</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#1F271B', opacity: 0.6 }}>
+                  Include all attachments for your quote in one place
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
+                  {attachmentFiles.length} of 10 uploaded
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAttachmentFiles([])}
+                  className="p-1.5 rounded transition-colors"
+                  style={{ color: '#1F271B', opacity: 0.7 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#FEE2E2' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                  title="Clear attachments"
+                >
+                  <FiTrash2 size={16} />
+                </button>
+              </div>
+            </div>
+            <div
+              className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 mt-3"
+              style={{ borderColor: '#EAEBED', backgroundColor: '#FAFAFA' }}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#28AFB0' }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = '#EAEBED' }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.style.borderColor = '#EAEBED'
+                const files = Array.from(e.dataTransfer.files)
+                setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10))
+              }}
+            >
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                multiple
+                accept=".jpeg,.jpg,.png,.heic,.pdf,.docx,image/jpeg,image/png,image/heic,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) => {
+                  const files = e.target.files ? Array.from(e.target.files) : []
+                  setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10))
+                  e.target.value = ''
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={attachmentFiles.length >= 10}
+                className="px-4 py-2 border rounded-lg text-sm font-medium transition-colors"
+                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'rgba(40, 175, 176, 0.08)' }}
+                onMouseEnter={(e) => { if (attachmentFiles.length < 10) { e.currentTarget.style.backgroundColor = 'rgba(40, 175, 176, 0.15)' } }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(40, 175, 176, 0.08)' }}
+              >
+                Select files
+              </button>
+              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                JPEG, PNG, HEIC, PDF, DOCX, up to 50MB each
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setAttachmentFiles([])}
+                className="px-4 py-2 border rounded-lg text-sm font-medium transition-colors"
+                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => alert('Attachments saved. (Static UI)')}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{ backgroundColor: '#28AFB0' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* Internal Notes Section - after Attachments */}
           <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
             <h2 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Internal notes</h2>
             <p className="text-xs mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
@@ -1084,116 +1181,101 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               onChange={(e) => setInternalNote(e.target.value)}
               placeholder="Note details"
               rows={4}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none mb-3"
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
               style={{ borderColor: '#EAEBED', color: '#1F271B' }}
             />
-            <div className="border-2 border-dashed rounded p-4 text-center" style={{ borderColor: '#EAEBED' }}>
-              <p className="text-sm mb-2" style={{ color: '#1F271B', opacity: 0.6 }}>
-                Drag your files here or{' '}
-                <button className="text-sm font-medium" style={{ color: '#28AFB0' }}>
-                  Select a File
-                </button>
-              </p>
-            </div>
           </div>
         </div>
 
         {/* Right Column - Sidebar */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Work Order Detailed Section */}
+          {/* Work Order Details - Jobber-style table */}
           <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
             <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Work Order Details</h2>
-            <div className="space-y-3">
-              {workorder.quoteNumber && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Last Quote</p>
+            <div className="divide-y" style={{ borderColor: '#EAEBED' }}>
+              {/* Created at */}
+              <div className="flex justify-between items-center py-2.5 first:pt-0">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Created at</span>
+                <span className="text-xs" style={{ color: '#1F271B' }}>
+                  {(workorder as any).createdAt
+                    ? format(new Date((workorder as any).createdAt), 'MMM dd, yyyy')
+                    : '—'}
+                </span>
+              </div>
+              {/* Last Quote */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Last Quote</span>
+                {workorder.quoteNumber ? (
                   <a href="#" className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
                     <FiFileText size={12} />
                     <span>{workorder.quoteNumber}.pdf</span>
                   </a>
-                </div>
-              )}
-              {workorder.invoiceNumber && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Last Invoice</p>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>—</span>
+                )}
+              </div>
+              {/* Quote sent */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Quote sent</span>
+                {workorder.quoteDateSent ? (
+                  <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
+                    <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                    {format(new Date(workorder.quoteDateSent), 'MMM dd, yyyy')}
+                  </span>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                )}
+              </div>
+              {/* Quote WhatsApp status */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Quote WhatsApp status</span>
+                <span
+                  className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    backgroundColor: workorder.quoteWhatsappStatus === 'sent' ? '#059669' : '#F3F4F6',
+                    color: workorder.quoteWhatsappStatus === 'sent' ? '#fff' : '#1F271B',
+                  }}
+                >
+                  {workorder.quoteWhatsappStatus || 'Not sent'}
+                </span>
+              </div>
+              {/* Last Invoice */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Last Invoice</span>
+                {workorder.invoiceNumber ? (
                   <a href="#" className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
                     <FiFileText size={12} />
                     <span>{workorder.invoiceNumber}.pdf</span>
                   </a>
-                </div>
-              )}
-              <div>
-                <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote sent</p>
-                <div className="flex items-center gap-2">
-                  {workorder.quoteDateSent ? (
-                    <>
-                      <FiCheckCircle size={12} style={{ color: '#059669' }} />
-                      <span className="text-xs" style={{ color: '#1F271B' }}>
-                        {format(new Date(workorder.quoteDateSent), 'MMM dd, yyyy')}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
-                  )}
-                </div>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>—</span>
+                )}
               </div>
-              <div>
-                <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote WhatsApp status</p>
-                <span className="inline-block px-2 py-1 rounded text-xs" style={{ 
-                  backgroundColor: workorder.quoteWhatsappStatus === 'sent' ? '#D1FAE5' : '#F3F4F6',
-                  color: workorder.quoteWhatsappStatus === 'sent' ? '#065F46' : '#1F271B'
-                }}>
-                  {workorder.quoteWhatsappStatus || 'Not sent'}
-                </span>
+              {/* Invoice sent */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice sent</span>
+                {workorder.invoiceDateSent ? (
+                  <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
+                    <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                    {format(new Date(workorder.invoiceDateSent), 'MMM dd, yyyy')}
+                  </span>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                )}
               </div>
-              <div>
-                <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice sent</p>
-                <div className="flex items-center gap-2">
-                  {workorder.invoiceDateSent ? (
-                    <>
-                      <FiCheckCircle size={12} style={{ color: '#059669' }} />
-                      <span className="text-xs" style={{ color: '#1F271B' }}>
-                        {format(new Date(workorder.invoiceDateSent), 'MMM dd, yyyy')}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice WhatsApp status</p>
-                <span className="inline-block px-2 py-1 rounded text-xs" style={{ 
-                  backgroundColor: workorder.invoiceWhatsappStatus === 'sent' ? '#D1FAE5' : '#F3F4F6',
-                  color: workorder.invoiceWhatsappStatus === 'sent' ? '#065F46' : '#1F271B'
-                }}>
+              {/* Invoice WhatsApp status */}
+              <div className="flex justify-between items-center py-2.5 last:pb-0">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice WhatsApp status</span>
+                <span
+                  className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                  style={{
+                    backgroundColor: workorder.invoiceWhatsappStatus === 'sent' ? '#059669' : '#F3F4F6',
+                    color: workorder.invoiceWhatsappStatus === 'sent' ? '#fff' : '#1F271B',
+                  }}
+                >
                   {workorder.invoiceWhatsappStatus || 'Not sent'}
                 </span>
               </div>
-              {(workorder as any).quoteObservations && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote Observations</p>
-                  <p className="text-xs" style={{ color: '#1F271B' }}>{(workorder as any).quoteObservations}</p>
-                </div>
-              )}
-              {(workorder as any).quoteTermsAndConditions && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote T&C</p>
-                  <p className="text-xs" style={{ color: '#1F271B' }}>{(workorder as any).quoteTermsAndConditions}</p>
-                </div>
-              )}
-              {(workorder as any).invoiceObservations && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice Observations</p>
-                  <p className="text-xs" style={{ color: '#1F271B' }}>{(workorder as any).invoiceObservations}</p>
-                </div>
-              )}
-              {(workorder as any).invoiceTermsAndConditions && (
-                <div>
-                  <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice T&C</p>
-                  <p className="text-xs" style={{ color: '#1F271B' }}>{(workorder as any).invoiceTermsAndConditions}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1762,6 +1844,58 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
         </div>
       )}
 
+      <AddProductServiceModal
+        isOpen={isAddProductModalOpen}
+        onClose={() => setIsAddProductModalOpen(false)}
+        initialName={(newLineItem.name || '').trim()}
+        onSave={(data: NewProductServiceData) => {
+          setNewLineItem((prev) => ({
+            ...prev,
+            name: data.name,
+            description: data.description,
+            unitPrice: data.unitPrice,
+          }))
+          setLineItemError('')
+          setIsAddProductModalOpen(false)
+        }}
+      />
+
+      {(sendEmailModalType || isCreateJobReportModalOpen) && (
+        <>
+          <SendEmailModal
+            isOpen={!!sendEmailModalType}
+            onClose={() => setSendEmailModalType(null)}
+            type={sendEmailModalType}
+            workorderId={workorderId}
+            workorderAttachments={attachmentFiles}
+            onAddWorkorderAttachment={(file) => setAttachmentFiles(prev => [...prev, file].slice(0, 10))}
+            onSend={() => {
+              if (sendEmailModalType === 'work-order-report') {
+                const sentAt = new Date().toISOString()
+                setJobReportSentAt(sentAt)
+                const wo = mockWorkorders.find(w => w.id === workorderId)
+                if (wo) (wo as any).jobReportSentAt = sentAt
+                setSendEmailModalType(null)
+                alert('Work order report sent successfully!')
+              } else {
+                alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : sendEmailModalType === 'invoice' ? 'Invoice sent successfully!' : 'Job follow-up sent successfully!')
+              }
+            }}
+          />
+          <CreateJobReportModal
+            isOpen={isCreateJobReportModalOpen}
+            onClose={() => setIsCreateJobReportModalOpen(false)}
+            workorderTitle={workorder?.title}
+            onSave={(report) => {
+              const url = `/reports/job-${workorderId}.pdf`
+              setJobReportPdfUrl(url)
+              const wo = mockWorkorders.find(w => w.id === workorderId)
+              if (wo) (wo as any).jobReportPdfUrl = url
+              setIsCreateJobReportModalOpen(false)
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }

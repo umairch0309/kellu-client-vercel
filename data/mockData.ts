@@ -451,6 +451,34 @@ export const mockTeamMembers = [
   },
 ]
 
+// Company settings: tax rate from Settings (Company settings). Default 19%.
+export const companyTaxRatePercent = 19
+
+// Quote section: defaults from system settings (editable in Settings, prefilled on workorder, can override per workorder).
+// "Apply to all future quotes" in workorder detail updates these.
+export const quoteSettings = {
+  clientMessage: '',
+  termsAndConditions: 'This quote is valid for the next 30 days, after which values may be subject to change.',
+}
+
+// Invoice section: same pattern as quote (prefilled from settings, editable at workorder level, "Apply to all future invoices").
+export const invoiceSettings = {
+  clientMessage: '',
+  termsAndConditions: 'Payment is due within 30 days of invoice date. Late payments may be subject to interest.',
+}
+
+// Materials / products-services list for line item name autocomplete (filtered by what user types)
+export const mockMaterialsList = [
+  { id: 1, name: 'Duct Cleaning', description: 'Professional cleaning of HVAC ductwork including supply, return vents, and trunk lines.', unitPrice: 5670 },
+  { id: 2, name: 'Air Conditioner Installation', description: 'Installation of a central air conditioning unit, including the outdoor condenser, indoor evaporator coil, refrigerant line set, and thermostat.', unitPrice: 0 },
+  { id: 3, name: 'Plumbing Repair', description: 'General plumbing repair and maintenance services', unitPrice: 150 },
+  { id: 4, name: 'HVAC Maintenance', description: 'Annual HVAC system maintenance and inspection', unitPrice: 320 },
+  { id: 5, name: 'Exterior Window Cleaning', description: 'Includes cleaning of all exterior windows, frames, and sills.', unitPrice: 0 },
+  { id: 6, name: 'Interior Window Cleaning', description: 'Cleaning of all interior windows including frames and sills by hand washing.', unitPrice: 0 },
+  { id: 7, name: 'Free Assessment', description: 'Our experts will come to assess your needs and discuss solutions', unitPrice: 0 },
+  { id: 8, name: 'Parts', description: 'Replacement parts and materials', unitPrice: 0 },
+]
+
 export const mockExpenses = [
   {
     id: 1,

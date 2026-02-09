@@ -78,7 +78,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
             }}
           >
             <FiMail size={14} />
-            <span>Email</span>
+            <span>Send Email</span>
           </button>
           <button
             onClick={() => router.push(`/clients/${clientId}/edit`)}
@@ -289,7 +289,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                   <input type="checkbox" className="mt-0.5" style={{ accentColor: '#28AFB0' }} />
                   <div className="flex-1">
                     <p className="text-xs" style={{ color: '#1F271B' }}>
-                      Visit for job #{clientWorkorders[0].id} - {clientWorkorders[0].title} re: {client.name}
+                      Job #{clientWorkorders[0].id} - {clientWorkorders[0].title} re: {client.name}
                     </p>
                     <p className="text-[10px] mt-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>
                       {clientWorkorders[0].schedule.day} • Assigned to {clientWorkorders[0].assignedTeamMember}

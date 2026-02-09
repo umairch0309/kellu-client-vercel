@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { FiX, FiChevronDown, FiPlus, FiCheckCircle } from 'react-icons/fi'
+import { FiX, FiChevronDown, FiPlus, FiCheckCircle, FiTrash2 } from 'react-icons/fi'
 import { format } from 'date-fns'
-import { mockClients, mockTeamMembers } from '@/data/mockData'
+import { mockClients, mockTeamMembers, mockMaterialsList, companyTaxRatePercent } from '@/data/mockData'
 import AddClientModal from './AddClientModal'
+import AddProductServiceModal, { type NewProductServiceData } from './AddProductServiceModal'
 
 interface AddWorkorderModalProps {
   isOpen: boolean
@@ -21,22 +22,24 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
   const [showInstructions, setShowInstructions] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
   const [anytime, setAnytime] = useState(false)
+  const [lineItemNameDropdownIndex, setLineItemNameDropdownIndex] = useState<number | null>(null)
   const typeDropdownRef = useRef<HTMLDivElement>(null)
+  const lineItemsSectionRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) {
         setIsTypeDropdownOpen(false)
       }
+      if (lineItemNameDropdownIndex !== null && lineItemsSectionRef.current && !lineItemsSectionRef.current.contains(target)) {
+        setLineItemNameDropdownIndex(null)
+      }
     }
-    if (isTypeDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isTypeDropdownOpen])
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isTypeDropdownOpen, lineItemNameDropdownIndex])
   const [formData, setFormData] = useState({
     client: '',
     address: '',
@@ -47,10 +50,15 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
     startDate: format(new Date(), 'MMM d, yyyy'),
     startTime: '03:15 AM',
     endTime: '04:15 AM',
-    lineItems: [] as Array<{ name: string; quantity: number; unitPrice: number }>,
+    lineItems: [] as Array<{ name: string; description: string; quantity: number; unitPrice: number }>,
+    discountPercent: 0,
   })
   const [showLineItems, setShowLineItems] = useState(false)
   const [isAddClientOpen, setIsAddClientOpen] = useState(false)
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
+  const [addProductModalLineIndex, setAddProductModalLineIndex] = useState<number | null>(null)
+  const [addProductModalInitialName, setAddProductModalInitialName] = useState('')
+  const [customMaterials, setCustomMaterials] = useState<Array<{ id: number; name: string; description: string; unitPrice: number }>>([])
 
   // Update form data when initialDate, initialTime, or initialClientId changes
   useEffect(() => {
@@ -95,6 +103,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
       startTime: '03:15 AM',
       endTime: '04:15 AM',
       lineItems: [],
+      discountPercent: 0,
     })
     setShowInstructions(false)
     setShowAssign(false)
@@ -354,7 +363,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               </div>
             )}
 
-            {/* Line Items - Only for Workorder */}
+            {/* Product / Service - Line Items (Jobber-style), only for Workorder */}
             {taskType === 'workorder' && (
               <>
                 {!showLineItems ? (
@@ -367,76 +376,163 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                     <span>Line items</span>
                   </button>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div ref={lineItemsSectionRef} className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-dark">Line items</span>
+                      <span className="text-sm font-semibold text-neutral-dark">Product / Service</span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setFormData({ ...formData, lineItems: [...formData.lineItems, { name: '', quantity: 1, unitPrice: 0 }] })
-                        }}
-                        className="text-sm text-primary hover:text-primary-dark"
+                        onClick={() => setFormData({ ...formData, lineItems: [...formData.lineItems, { name: '', description: '', quantity: 1, unitPrice: 0 }] })}
+                        className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
                       >
                         <FiPlus size={12} />
+                        <span>Add Line Item</span>
                       </button>
                     </div>
-                    {formData.lineItems.map((item, index) => (
-                      <div key={index} className="flex gap-1.5">
+                    {formData.lineItems.length === 0 ? (
+                      <p className="text-xs text-neutral-dark/60">No line items. Click &quot;Add Line Item&quot; to add.</p>
+                    ) : (
+                      <>
+                        {formData.lineItems.map((item, index) => {
+                          const allMaterials = [...mockMaterialsList, ...customMaterials]
+                          const filteredMaterials = allMaterials.filter(m => m.name.toLowerCase().includes((item.name || '').toLowerCase()))
+                          const hasExactMatch = filteredMaterials.some(m => m.name.toLowerCase() === (item.name || '').trim().toLowerCase())
+                          const showCreateNew = (item.name || '').trim() !== '' && (filteredMaterials.length === 0 || !hasExactMatch)
+                          const showDropdown = lineItemNameDropdownIndex === index && (filteredMaterials.length > 0 || showCreateNew)
+                          const lineTotal = (item.quantity || 0) * (item.unitPrice || 0)
+                          return (
+                            <div key={index} className="p-2 border border-neutral-light rounded space-y-2 bg-white">
+                              <div className="relative">
+                                <label className="block text-xs font-medium text-neutral-dark/80 mb-0.5">Name</label>
                         <input
                           type="text"
-                          placeholder="Item name"
+                                  placeholder="Type to search..."
                           value={item.name}
                           onChange={(e) => {
                             const newItems = [...formData.lineItems]
-                            newItems[index].name = e.target.value
+                                    newItems[index] = { ...newItems[index], name: e.target.value }
+                                    setFormData({ ...formData, lineItems: newItems })
+                                  }}
+                                  onFocus={() => setLineItemNameDropdownIndex(index)}
+                                  className="w-full px-2 py-1.5 border border-neutral-light rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                {showDropdown && (
+                                  <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-neutral-light rounded shadow-lg max-h-40 overflow-y-auto">
+                                    {filteredMaterials.slice(0, 6).map((m) => (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => {
+                                          const newItems = [...formData.lineItems]
+                                          newItems[index] = { ...newItems[index], name: m.name, description: m.description || '', unitPrice: m.unitPrice }
+                                          setFormData({ ...formData, lineItems: newItems })
+                                          setLineItemNameDropdownIndex(null)
+                                        }}
+                                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-50 border-b border-neutral-light last:border-b-0"
+                                      >
+                                        {m.name} {m.unitPrice > 0 && `Rs${m.unitPrice}`}
+                                      </button>
+                                    ))}
+                                    {showCreateNew && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAddProductModalInitialName((item.name || '').trim())
+                                          setAddProductModalLineIndex(index)
+                                          setIsAddProductModalOpen(true)
+                                          setLineItemNameDropdownIndex(null)
+                                        }}
+                                        className="w-full text-left px-2 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 font-medium border-t border-neutral-light"
+                                        style={{ color: '#28AFB0' }}
+                                      >
+                                        <FiPlus size={14} />
+                                        Create new item
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-neutral-dark/80 mb-0.5">Description</label>
+                                <textarea
+                                  placeholder="Description"
+                                  value={item.description || ''}
+                                  onChange={(e) => {
+                                    const newItems = [...formData.lineItems]
+                                    newItems[index] = { ...newItems[index], description: e.target.value }
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="flex-1 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                                  rows={1}
+                                  className="w-full px-2 py-1 border border-neutral-light rounded text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
                         />
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="number"
                           placeholder="Qty"
-                          value={item.quantity}
+                                  value={item.quantity || ''}
                           onChange={(e) => {
                             const newItems = [...formData.lineItems]
-                            newItems[index].quantity = parseFloat(e.target.value) || 0
+                                    newItems[index] = { ...newItems[index], quantity: parseFloat(e.target.value) || 0 }
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="w-16 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                                  min="0"
+                                  step="0.01"
+                                  className="w-14 px-2 py-1 border border-neutral-light rounded text-sm"
                         />
                         <input
                           type="number"
-                          placeholder="Price"
-                          value={item.unitPrice}
+                                  placeholder="Unit price"
+                                  value={item.unitPrice || ''}
                           onChange={(e) => {
                             const newItems = [...formData.lineItems]
-                            newItems[index].unitPrice = parseFloat(e.target.value) || 0
+                                    newItems[index] = { ...newItems[index], unitPrice: parseFloat(e.target.value) || 0 }
                             setFormData({ ...formData, lineItems: newItems })
                           }}
-                          className="w-20 px-2 py-1 border border-neutral-light rounded focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                                  min="0"
+                                  step="0.01"
+                                  className="w-20 px-2 py-1 border border-neutral-light rounded text-sm"
                         />
+                                <span className="text-xs font-semibold text-neutral-dark">Rs{lineTotal.toFixed(2)}</span>
                         <button
                           type="button"
-                          onClick={() => {
-                            const newItems = formData.lineItems.filter((_, i) => i !== index)
-                            setFormData({ ...formData, lineItems: newItems })
-                          }}
-                          className="px-1 text-neutral-dark/50 hover:text-neutral-dark"
-                        >
-                          <FiX size={12} />
+                                  onClick={() => setFormData({ ...formData, lineItems: formData.lineItems.filter((_, i) => i !== index) })}
+                                  className="p-1 text-neutral-dark/60 hover:text-red-600 ml-auto"
+                                  title="Delete line"
+                                >
+                                  <FiTrash2 size={14} />
                         </button>
                       </div>
-                    ))}
-                    {formData.lineItems.length === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData({ ...formData, lineItems: [{ name: '', quantity: 1, unitPrice: 0 }] })
-                        }}
-                        className="w-full text-sm text-primary hover:text-primary-dark py-1"
-                      >
-                        Add line item
-                      </button>
+                            </div>
+                          )
+                        })}
+                        {(() => {
+                          const subtotal = formData.lineItems.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0), 0)
+                          const discountAmt = (subtotal * (formData.discountPercent || 0)) / 100
+                          const afterDisc = subtotal - discountAmt
+                          const taxAmt = (afterDisc * companyTaxRatePercent) / 100
+                          const total = afterDisc + taxAmt
+                          return (
+                            <div className="pt-2 border-t border-neutral-light space-y-1 text-sm">
+                              <div className="flex justify-between"><span className="text-neutral-dark/80">Subtotal</span><span>Rs{subtotal.toFixed(2)}</span></div>
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="text-neutral-dark/80">Discount (%)</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.5"
+                                  value={formData.discountPercent ?? ''}
+                                  onChange={(e) => setFormData({ ...formData, discountPercent: parseFloat(e.target.value) || 0 })}
+                                  className="w-14 px-1 py-0.5 border border-neutral-light rounded text-right text-xs"
+                                />
+                                <span className="w-16 text-right">Rs{discountAmt.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between"><span className="text-neutral-dark/80">Tax ({companyTaxRatePercent}%)</span><span>Rs{taxAmt.toFixed(2)}</span></div>
+                              <div className="flex justify-between font-semibold pt-1"><span>Total</span><span>Rs{total.toFixed(2)}</span></div>
+                            </div>
+                          )
+                        })()}
+                      </>
                     )}
                   </div>
                 )}
@@ -543,6 +639,40 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
             client: data.name,
             address: data.address || prev.address,
           }))
+        }}
+      />
+
+      <AddProductServiceModal
+        isOpen={isAddProductModalOpen}
+        onClose={() => {
+          setIsAddProductModalOpen(false)
+          setAddProductModalLineIndex(null)
+        }}
+        initialName={addProductModalInitialName}
+        onSave={(data: NewProductServiceData) => {
+          setCustomMaterials((prev) => [
+            ...prev,
+            {
+              id: 10000 + prev.length,
+              name: data.name,
+              description: data.description,
+              unitPrice: data.unitPrice,
+            },
+          ])
+          if (addProductModalLineIndex !== null) {
+            setFormData((prev) => {
+              const next = [...prev.lineItems]
+              next[addProductModalLineIndex] = {
+                ...next[addProductModalLineIndex],
+                name: data.name,
+                description: data.description,
+                unitPrice: data.unitPrice,
+              }
+              return { ...prev, lineItems: next }
+            })
+          }
+          setIsAddProductModalOpen(false)
+          setAddProductModalLineIndex(null)
         }}
       />
     </div>

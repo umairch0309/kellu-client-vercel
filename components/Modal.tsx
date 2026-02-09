@@ -9,9 +9,10 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  maxHeight?: string
 }
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, size = 'md', maxHeight }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -41,7 +42,10 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
       />
       
       {/* Modal */}
-      <div className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-hidden flex flex-col`}>
+      <div
+        className={`relative bg-white rounded-lg shadow-xl w-full ${sizeClasses[size]} overflow-hidden flex flex-col`}
+        style={maxHeight ? { maxHeight } : { maxHeight: '90vh' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 md:p-6 border-b border-neutral-light">
           <h2 className="text-xl md:text-2xl font-bold text-neutral-dark">{title}</h2>

@@ -1,26 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { FiSearch, FiFileText, FiSend, FiDollarSign } from 'react-icons/fi'
+import { useRouter } from 'next/navigation'
+import { FiSearch } from 'react-icons/fi'
 import { mockWorkorders } from '@/data/mockData'
 
-const invoices = mockWorkorders
-  .filter(wo => wo.invoiceStatus !== 'not sent')
-  .map(wo => ({
-    id: wo.id,
-    invoiceNumber: wo.invoiceNumber,
-    clientName: wo.clientName,
-    title: wo.title,
-    total: wo.total,
-    dateSent: wo.invoiceDateSent,
-    status: wo.invoiceStatus,
-    whatsappStatus: wo.invoiceWhatsappStatus,
-    balance: wo.total - (wo.payments.reduce((sum, p) => sum + p.amount, 0)),
-  }))
-
 export default function InvoicesList() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const invoices = mockWorkorders
+    .filter(wo => wo.invoiceStatus !== 'not sent')
+    .map(wo => ({
+      id: wo.id,
+      invoiceNumber: wo.invoiceNumber,
+      clientName: wo.clientName,
+      title: wo.title,
+      total: wo.total,
+      dateSent: wo.invoiceDateSent,
+      status: wo.invoiceStatus,
+      whatsappStatus: wo.invoiceWhatsappStatus,
+      balance: wo.total - (wo.payments?.reduce((sum, p) => sum + p.amount, 0) ?? 0),
+    }))
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -31,9 +33,14 @@ export default function InvoicesList() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" style={{ minHeight: '100vh', padding: '1rem 0', backgroundColor: 'white' }}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-neutral-dark">Invoices</h1>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold" style={{ color: '#1F271B' }}>Invoices</h1>
+          <p className="text-sm mt-1" style={{ color: '#1F271B', opacity: 0.7 }}>
+            Job-based invoices. Line items are taken from the job. Create and send from the job page or send from here.
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
@@ -93,24 +100,18 @@ export default function InvoicesList() {
         {/* Mobile Card View */}
         <div className="md:hidden divide-y divide-neutral-light">
           {filteredInvoices.map((invoice) => (
-            <div key={invoice.id} className="p-4 hover:bg-neutral-light/50">
+            <div
+              key={invoice.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => router.push(`/workorders/${invoice.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/workorders/${invoice.id}`) } }}
+              className="p-4 hover:bg-neutral-light/50 cursor-pointer active:bg-neutral-light/70"
+            >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-neutral-dark">{invoice.invoiceNumber}</p>
                   <p className="text-xs text-neutral-dark/70 mt-1">{invoice.title}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-2">
-                  <button className="p-2 hover:bg-neutral-light rounded-lg text-secondary">
-                    <FiSend size={18} />
-                  </button>
-                  <button className="p-2 hover:bg-neutral-light rounded-lg text-neutral-dark">
-                    <FiFileText size={18} />
-                  </button>
-                  {invoice.balance > 0 && (
-                    <button className="p-2 hover:bg-neutral-light rounded-lg text-secondary">
-                      <FiDollarSign size={18} />
-                    </button>
-                  )}
                 </div>
               </div>
               <div className="space-y-1 mt-2">
@@ -155,14 +156,17 @@ export default function InvoicesList() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">Total</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">Balance</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredInvoices.map((invoice) => (
                 <tr
                   key={invoice.id}
-                  className="border-b border-neutral-light hover:bg-neutral-light/50"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/workorders/${invoice.id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/workorders/${invoice.id}`) } }}
+                  className="border-b border-neutral-light hover:bg-neutral-light/50 cursor-pointer active:bg-neutral-light/70"
                 >
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-neutral-dark">{invoice.invoiceNumber}</p>
@@ -186,21 +190,6 @@ export default function InvoicesList() {
                     }`}>
                       ${invoice.balance}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button className="p-2 hover:bg-neutral-light rounded-lg text-secondary">
-                        <FiSend size={18} />
-                      </button>
-                      <button className="p-2 hover:bg-neutral-light rounded-lg text-neutral-dark">
-                        <FiFileText size={18} />
-                      </button>
-                      {invoice.balance > 0 && (
-                        <button className="p-2 hover:bg-neutral-light rounded-lg text-secondary">
-                          <FiDollarSign size={18} />
-                        </button>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))}

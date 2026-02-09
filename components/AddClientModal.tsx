@@ -113,7 +113,7 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
   const focusRing = 'focus:ring-[#28AFB0] focus:border-[#28AFB0]'
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={mode === 'update' ? 'Update Client' : 'New Client'} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={mode === 'update' ? 'Update Client' : 'Add Client'} size="md" maxHeight="80vh">
       <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
         <div className="space-y-6 pb-1">
           {/* Contact details */}

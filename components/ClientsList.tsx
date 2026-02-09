@@ -1,19 +1,22 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { FiPlus, FiSearch, FiChevronRight, FiChevronUp, FiChevronDown, FiDownload, FiUpload, FiTrash2, FiFile } from 'react-icons/fi'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { FiPlus, FiSearch, FiChevronRight, FiChevronUp, FiChevronDown, FiDownload, FiUpload, FiTrash2, FiFile, FiArchive } from 'react-icons/fi'
 import { mockClients } from '@/data/mockData'
+import AddClientModal from './AddClientModal'
 
 type NameSortOption = 'first-az' | 'first-za' | 'last-az' | 'last-za'
 type LastActivitySortOption = 'newest' | 'oldest'
 
 export default function ClientsList() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('Active') // '' = All, or 'Active' | 'Follow Up' | 'Archive'
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false)
   const [selectedClientIds, setSelectedClientIds] = useState<Set<number>>(new Set())
   const [nameSort, setNameSort] = useState<NameSortOption>('first-az')
   const [lastActivitySort, setLastActivitySort] = useState<LastActivitySortOption>('newest')
@@ -25,6 +28,14 @@ export default function ClientsList() {
   const nameSortRef = useRef<HTMLDivElement>(null)
   const lastActivitySortRef = useRef<HTMLDivElement>(null)
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null)
+
+  // Open Add Client modal when navigating from /clients/new (redirected with ?new=1)
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setIsAddClientOpen(true)
+      router.replace('/clients', { scroll: false })
+    }
+  }, [searchParams, router])
 
   // Calculate stats
   const totalClients = mockClients.length
@@ -161,7 +172,7 @@ export default function ClientsList() {
         <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#1F271B' }}>Clients</h1>
         <div className="flex gap-2">
           <button
-            onClick={() => router.push('/clients/new')}
+            onClick={() => setIsAddClientOpen(true)}
             className="px-3 py-1.5 rounded text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
             style={{ backgroundColor: '#28AFB0' }}
             onMouseEnter={(e) => {
@@ -223,6 +234,16 @@ export default function ClientsList() {
                 >
                   <FiDownload size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
                   <span>Export Clients</span>
+                </button>
+                <button
+                  onClick={() => { handleArchiveSelected(); setIsMoreActionsOpen(false) }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors flex items-center gap-2 border-t"
+                  style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <FiArchive size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
+                  <span>Archive Clients</span>
                 </button>
               </div>
             )}
@@ -609,6 +630,12 @@ export default function ClientsList() {
           </div>
         </div>
       </div>
+
+      <AddClientModal
+        isOpen={isAddClientOpen}
+        onClose={() => setIsAddClientOpen(false)}
+        mode="new"
+      />
     </div>
   )
 }

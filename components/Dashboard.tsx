@@ -17,7 +17,7 @@ import { mockWorkorders, mockTeamMembers } from '@/data/mockData'
 export default function Dashboard() {
   const router = useRouter()
   const [isAddWorkorderOpen, setIsAddWorkorderOpen] = useState(false)
-  const [selectedViewTab, setSelectedViewTab] = useState<'Visit' | 'Employee'>('Visit')
+  const [selectedViewTab, setSelectedViewTab] = useState<'Schedule' | 'Employee'>('Schedule')
   
   // Get current date and time for greeting
   const currentDate = new Date()
@@ -114,7 +114,7 @@ export default function Dashboard() {
     })
   }, [])
 
-  // Group by status for Visit view
+  // Group by status for Schedule view
   const appointmentsByStatus = useMemo(() => {
     const grouped: Record<string, typeof todayAppointments> = {}
     todayAppointments.forEach(wo => {
@@ -245,21 +245,21 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="bg-white rounded-lg shadow-sm border overflow-hidden" style={{ borderColor: '#EAEBED' }}>
-              {/* Visit/Employee Tabs */}
+              {/* Schedule/Employee Tabs */}
               <div className="flex gap-0 border-b" style={{ borderBottomColor: '#EAEBED' }}>
                 <button
-                  onClick={() => setSelectedViewTab('Visit')}
+                  onClick={() => setSelectedViewTab('Schedule')}
                   className={`px-4 py-2.5 text-xs font-medium transition-colors ${
-                    selectedViewTab === 'Visit'
+                    selectedViewTab === 'Schedule'
                       ? 'text-neutral-dark bg-white border-b-2' 
                       : 'text-neutral-dark/60 hover:text-neutral-dark hover:bg-gray-50'
                   }`}
                   style={{
-                    borderBottomColor: selectedViewTab === 'Visit' ? '#1F271B' : 'transparent',
-                    borderBottomWidth: selectedViewTab === 'Visit' ? '2px' : '0'
+                    borderBottomColor: selectedViewTab === 'Schedule' ? '#1F271B' : 'transparent',
+                    borderBottomWidth: selectedViewTab === 'Schedule' ? '2px' : '0'
                   }}
                 >
-                  Visit
+                  Schedule
                 </button>
                 <button
                   onClick={() => setSelectedViewTab('Employee')}
@@ -279,8 +279,8 @@ export default function Dashboard() {
               
               {/* Content */}
               <div className="p-4">
-                {selectedViewTab === 'Visit' ? (
-                  // Visit View - Grouped by Status
+                {selectedViewTab === 'Schedule' ? (
+                  // Schedule View - Grouped by Status
                   <div className="space-y-4">
                     {Object.keys(appointmentsByStatus).length > 0 ? (
                       Object.entries(appointmentsByStatus).map(([status, appointments]) => (
@@ -334,7 +334,7 @@ export default function Dashboard() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>
-                          You have no visits scheduled today.
+                          You have nothing scheduled today.
                         </p>
                         <button
                           onClick={() => setIsAddWorkorderOpen(true)}
