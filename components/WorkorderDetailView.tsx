@@ -1927,36 +1927,37 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
         }}
       />
 
-      {(sendEmailModalType || isCreateJobReportModalOpen) && (
-        <>
-          <SendEmailModal
-            isOpen={!!sendEmailModalType}
-            onClose={() => { setSendEmailModalType(null); setSendingTallyWorkReport(false) }}
-            type={sendEmailModalType}
-            workorderId={workorderId}
-            workorderAttachments={attachmentFiles}
-            onAddWorkorderAttachment={(file) => setAttachmentFiles(prev => [...prev, file].slice(0, 10))}
-            onSend={() => {
-              if (sendEmailModalType === 'work-order-report') {
-                const sentAt = new Date().toISOString()
-                const wo = mockWorkorders.find(w => w.id === workorderId)
-                if (sendingTallyWorkReport) {
-                  setTallyWorkReportSentAt(sentAt)
-                  if (wo) (wo as any).tallyWorkReportSentAt = sentAt
-                  setSendingTallyWorkReport(false)
-                  alert('Work report (from Tally) sent successfully!')
-                } else {
-                  setJobReportSentAt(sentAt)
-                  if (wo) (wo as any).jobReportSentAt = sentAt
-                  alert('Work order report sent successfully!')
-                }
-                setSendEmailModalType(null)
+      {sendEmailModalType !== null && (
+        <SendEmailModal
+          isOpen={true}
+          onClose={() => { setSendEmailModalType(null); setSendingTallyWorkReport(false) }}
+          type={sendEmailModalType}
+          workorderId={workorderId}
+          workorderAttachments={attachmentFiles}
+          onAddWorkorderAttachment={(file) => setAttachmentFiles(prev => [...prev, file].slice(0, 10))}
+          onSend={() => {
+            if (sendEmailModalType === 'work-order-report') {
+              const sentAt = new Date().toISOString()
+              const wo = mockWorkorders.find(w => w.id === workorderId)
+              if (sendingTallyWorkReport) {
+                setTallyWorkReportSentAt(sentAt)
+                if (wo) (wo as any).tallyWorkReportSentAt = sentAt
+                setSendingTallyWorkReport(false)
+                alert('Work report (from Tally) sent successfully!')
               } else {
-                alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : sendEmailModalType === 'invoice' ? 'Invoice sent successfully!' : 'Job follow-up sent successfully!')
+                setJobReportSentAt(sentAt)
+                if (wo) (wo as any).jobReportSentAt = sentAt
+                alert('Work order report sent successfully!')
               }
-            }}
-          />
-          <CreateJobReportModal
+              setSendEmailModalType(null)
+            } else {
+              alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : sendEmailModalType === 'invoice' ? 'Invoice sent successfully!' : 'Job follow-up sent successfully!')
+            }
+          }}
+        />
+      )}
+      {isCreateJobReportModalOpen && (
+        <CreateJobReportModal
             isOpen={isCreateJobReportModalOpen}
             onClose={() => setIsCreateJobReportModalOpen(false)}
             workorderTitle={workorder?.title}
@@ -1968,7 +1969,6 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               setIsCreateJobReportModalOpen(false)
             }}
           />
-        </>
       )}
     </div>
   )
