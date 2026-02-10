@@ -22,8 +22,13 @@ import {
   FiLink,
   FiCreditCard,
   FiSend,
-  FiTrash2
+  FiTrash2,
+  FiExternalLink
 } from 'react-icons/fi'
+
+const TALLY_WORK_REPORT_BASE_URL = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_TALLY_WORK_REPORT_URL
+  ? process.env.NEXT_PUBLIC_TALLY_WORK_REPORT_URL
+  : 'https://tally.so'
 import { format } from 'date-fns'
 import { mockClients, mockWorkorders, mockMaterialsList, companyTaxRatePercent, quoteSettings, invoiceSettings } from '@/data/mockData'
 import AddProductServiceModal, { type NewProductServiceData } from './AddProductServiceModal'
@@ -84,6 +89,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const [jobReportPdfUrl, setJobReportPdfUrl] = useState<string | null>(null)
   const [jobReportSentAt, setJobReportSentAt] = useState<string | null>(null)
   const [isCreateJobReportModalOpen, setIsCreateJobReportModalOpen] = useState(false)
+  const [isFetchingTallyWorkReport, setIsFetchingTallyWorkReport] = useState(false)
+  const [tallyWorkReportSentAt, setTallyWorkReportSentAt] = useState<string | null>(null)
+  const [sendingTallyWorkReport, setSendingTallyWorkReport] = useState(false)
   const moreActionsRef = useRef<HTMLDivElement>(null)
   const lineItemNameDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -100,6 +108,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
     setInvoiceTermsAndConditions((workorder as any).invoiceTermsAndConditions ?? invoiceSettings?.termsAndConditions ?? '')
     setJobReportPdfUrl((workorder as any).jobReportPdfUrl ?? null)
     setJobReportSentAt((workorder as any).jobReportSentAt ?? null)
+    setTallyWorkReportSentAt((workorder as any).tallyWorkReportSentAt ?? null)
     setInternalNote((workorder as any).internalNote ?? '')
     setInvoiceInternalNote((workorder as any).invoiceInternalNote ?? '')
   }, [workorder])
@@ -236,6 +245,18 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 >
                   <FiFileText size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
                   <span>Create Job report</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const url = `${TALLY_WORK_REPORT_BASE_URL}${TALLY_WORK_REPORT_BASE_URL.includes('?') ? '&' : '?'}workorder=${workorderId}`
+                    window.open(url, '_blank', 'noopener,noreferrer')
+                    setIsMoreActionsOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
+                  style={{ color: '#1F271B' }}
+                >
+                  <FiExternalLink size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
+                  <span>Create Work report</span>
                 </button>
               </div>
             )}
@@ -427,6 +448,51 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 )}
               </div>
             )}
+          </div>
+
+          {/* Work report (Tally) – report created in Tally, fetch and send from here */}
+          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Work report (Tally)</h2>
+            <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>
+              Work reports are created in Tally (outside this platform). Use the button below to fetch the latest work report from Tally and send it to the customer.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={async () => {
+                  setIsFetchingTallyWorkReport(true)
+                  try {
+                    // In production: call your API that fetches the work report from Tally for this workorder
+                    await new Promise(resolve => setTimeout(resolve, 1500))
+                    setSendingTallyWorkReport(true)
+                    setSendEmailModalType('work-order-report')
+                  } finally {
+                    setIsFetchingTallyWorkReport(false)
+                  }
+                }}
+                disabled={isFetchingTallyWorkReport}
+                className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 shrink-0 disabled:opacity-60"
+                style={{ backgroundColor: '#28AFB0', color: 'white' }}
+                onMouseEnter={(e) => { if (!isFetchingTallyWorkReport) e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
+              >
+                {isFetchingTallyWorkReport ? (
+                  <>
+                    <FiClock size={14} className="animate-pulse" />
+                    Fetching from Tally…
+                  </>
+                ) : (
+                  <>
+                    <FiMail size={14} />
+                    Send work report
+                  </>
+                )}
+              </button>
+              {tallyWorkReportSentAt && (
+                <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                  Last sent {format(new Date(tallyWorkReportSentAt), 'MMM dd, yyyy')}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Grouped: Profitability + Line Items + Expenses — grey outer, white div per section */}
@@ -929,8 +995,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                     }
                     const wo = mockWorkorders.find(w => w.id === workorderId)
                     if (wo) {
-                      (wo as any).internalNote = internalNote
-                      (wo as any).invoiceInternalNote = invoiceInternalNote
+                      const woAny = wo as Record<string, unknown>
+                      woAny.internalNote = internalNote
+                      woAny.invoiceInternalNote = invoiceInternalNote
                     }
                     alert(applyToAllFutureInvoices
                       ? 'Invoice section saved. Defaults in Settings have been updated for all future invoices.'
@@ -1864,7 +1931,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
         <>
           <SendEmailModal
             isOpen={!!sendEmailModalType}
-            onClose={() => setSendEmailModalType(null)}
+            onClose={() => { setSendEmailModalType(null); setSendingTallyWorkReport(false) }}
             type={sendEmailModalType}
             workorderId={workorderId}
             workorderAttachments={attachmentFiles}
@@ -1872,11 +1939,18 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             onSend={() => {
               if (sendEmailModalType === 'work-order-report') {
                 const sentAt = new Date().toISOString()
-                setJobReportSentAt(sentAt)
                 const wo = mockWorkorders.find(w => w.id === workorderId)
-                if (wo) (wo as any).jobReportSentAt = sentAt
+                if (sendingTallyWorkReport) {
+                  setTallyWorkReportSentAt(sentAt)
+                  if (wo) (wo as any).tallyWorkReportSentAt = sentAt
+                  setSendingTallyWorkReport(false)
+                  alert('Work report (from Tally) sent successfully!')
+                } else {
+                  setJobReportSentAt(sentAt)
+                  if (wo) (wo as any).jobReportSentAt = sentAt
+                  alert('Work order report sent successfully!')
+                }
                 setSendEmailModalType(null)
-                alert('Work order report sent successfully!')
               } else {
                 alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : sendEmailModalType === 'invoice' ? 'Invoice sent successfully!' : 'Job follow-up sent successfully!')
               }

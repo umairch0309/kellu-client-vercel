@@ -562,10 +562,10 @@ export default function ClientsList() {
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shadow-sm" style={{ 
-                        backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : '#F3F4F6',
-                        color: client.status === 'Active' ? '#1E8A8B' : '#1F271B'
+                        backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : client.status === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                        color: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B'
                       }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : '#1F271B' }}></span>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
                         {client.status}
                       </span>
                     </td>
@@ -611,10 +611,10 @@ export default function ClientsList() {
                     <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
                   </div>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2" style={{ 
-                    backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : '#F3F4F6',
-                    color: client.status === 'Active' ? '#1E8A8B' : '#1F271B'
+                    backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : client.status === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                    color: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B'
                   }}>
-                    <span className="w-1 h-1 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : '#1F271B' }}></span>
+                    <span className="w-1 h-1 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
                     {client.status}
                   </span>
                 </div>
