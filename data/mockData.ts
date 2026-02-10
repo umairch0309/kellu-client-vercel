@@ -467,17 +467,33 @@ export const invoiceSettings = {
   termsAndConditions: 'Payment is due within 30 days of invoice date. Late payments may be subject to interest.',
 }
 
-// Materials / products-services list for line item name autocomplete (filtered by what user types)
-export const mockMaterialsList = [
-  { id: 1, name: 'Duct Cleaning', description: 'Professional cleaning of HVAC ductwork including supply, return vents, and trunk lines.', unitPrice: 5670 },
-  { id: 2, name: 'Air Conditioner Installation', description: 'Installation of a central air conditioning unit, including the outdoor condenser, indoor evaporator coil, refrigerant line set, and thermostat.', unitPrice: 0 },
-  { id: 3, name: 'Plumbing Repair', description: 'General plumbing repair and maintenance services', unitPrice: 150 },
-  { id: 4, name: 'HVAC Maintenance', description: 'Annual HVAC system maintenance and inspection', unitPrice: 320 },
-  { id: 5, name: 'Exterior Window Cleaning', description: 'Includes cleaning of all exterior windows, frames, and sills.', unitPrice: 0 },
-  { id: 6, name: 'Interior Window Cleaning', description: 'Cleaning of all interior windows including frames and sills by hand washing.', unitPrice: 0 },
-  { id: 7, name: 'Free Assessment', description: 'Our experts will come to assess your needs and discuss solutions', unitPrice: 0 },
-  { id: 8, name: 'Parts', description: 'Replacement parts and materials', unitPrice: 0 },
+// Master Price List per tenant (single source of truth for services and materials)
+export type MasterPriceItemType = 'service' | 'product'
+export interface MasterPriceItem {
+  id: number
+  type: MasterPriceItemType
+  name: string
+  description: string
+  cost: number
+  markupPercent: number
+  price: number
+}
+
+export const mockMasterPriceList: MasterPriceItem[] = [
+  { id: 1, type: 'service', name: 'Duct Cleaning', description: 'Professional cleaning of HVAC ductwork including supply, return vents, and trunk lines.', cost: 3000, markupPercent: 89, price: 5670 },
+  { id: 2, type: 'service', name: 'Air Conditioner Installation', description: 'Installation of a central air conditioning unit, including the outdoor condenser, indoor evaporator coil, refrigerant line set, and thermostat.', cost: 0, markupPercent: 0, price: 0 },
+  { id: 3, type: 'service', name: 'Plumbing Repair', description: 'General plumbing repair and maintenance services', cost: 80, markupPercent: 87.5, price: 150 },
+  { id: 4, type: 'service', name: 'HVAC Maintenance', description: 'Annual HVAC system maintenance and inspection', cost: 160, markupPercent: 100, price: 320 },
+  { id: 5, type: 'service', name: 'Exterior Window Cleaning', description: 'Includes cleaning of all exterior windows, frames, and sills.', cost: 0, markupPercent: 0, price: 0 },
+  { id: 6, type: 'service', name: 'Interior Window Cleaning', description: 'Cleaning of all interior windows including frames and sills by hand washing.', cost: 0, markupPercent: 0, price: 0 },
+  { id: 7, type: 'service', name: 'Free Assessment', description: 'Our experts will come to assess your needs and discuss solutions', cost: 0, markupPercent: 0, price: 0 },
+  { id: 8, type: 'product', name: 'Parts', description: 'Replacement parts and materials', cost: 0, markupPercent: 0, price: 0 },
+  { id: 9, type: 'service', name: 'Gutter Cleaning', description: 'Full gutter cleaning and flush.', cost: 0, markupPercent: 0, price: 0 },
+  { id: 10, type: 'service', name: 'Screen Cleaning', description: 'Removal, cleaning, and reinstallation of window screens.', cost: 0, markupPercent: 0, price: 0 },
 ]
+
+// Materials / products-services list for line item name autocomplete (derived from master price list)
+export const mockMaterialsList = mockMasterPriceList.map(({ id, name, description, price: unitPrice }) => ({ id, name, description, unitPrice }))
 
 export const mockExpenses = [
   {

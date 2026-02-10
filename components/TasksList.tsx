@@ -63,34 +63,38 @@ export default function TasksList() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-neutral-light">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-dark/50" size={18} />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="in-progress">In Progress</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
-      </div>
-
       {/* Tasks List */}
       <div className="bg-white rounded-lg shadow-sm border border-neutral-light overflow-hidden">
+        {/* Filters + Search - single line (consistent with Workorders) */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 p-3 border-b border-neutral-light">
+          <h2 className="text-base font-bold" style={{ color: '#1F271B' }}>
+            All tasks ({filteredTasks.length} result{filteredTasks.length !== 1 ? 's' : ''})
+          </h2>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 sm:flex-initial justify-end">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 border rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+              style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: '#F3F4F6' }}
+            >
+              <option value="all">Status | All</option>
+              <option value="pending">Pending</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]">
+              <FiSearch className="absolute left-2.5 top-1/2 transform -translate-y-1/2" size={14} style={{ color: '#1F271B', opacity: 0.5 }} />
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+              />
+            </div>
+          </div>
+        </div>
         {/* Mobile Card View */}
         <div className="md:hidden divide-y divide-neutral-light">
           {filteredTasks.map((task) => (

@@ -3,6 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
+const AUTH_VERIFIED_KEY = 'authVerified'
+
+function getInitialLoading(): boolean {
+  if (typeof window === 'undefined') return true
+  return sessionStorage.getItem(AUTH_VERIFIED_KEY) !== '1'
+}
+
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
@@ -10,17 +17,18 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(getInitialLoading)
 
   useEffect(() => {
-    // Check if user is logged in
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-    
+
     if (!isLoggedIn && pathname !== '/login') {
+      sessionStorage.removeItem(AUTH_VERIFIED_KEY)
       router.push('/login')
-    } else {
-      setIsLoading(false)
+      return
     }
+    sessionStorage.setItem(AUTH_VERIFIED_KEY, '1')
+    setIsLoading(false)
   }, [router, pathname])
 
   if (isLoading) {

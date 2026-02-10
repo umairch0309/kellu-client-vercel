@@ -113,6 +113,15 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
     setInvoiceInternalNote((workorder as any).invoiceInternalNote ?? '')
   }, [workorder])
 
+  // Seed 2–3 workorder attachments so the send-email modal can show opt-in/opt-out for this email
+  useEffect(() => {
+    setAttachmentFiles([
+      new File([], 'Quote.pdf', { type: 'application/pdf' }),
+      new File([], 'Invoice.pdf', { type: 'application/pdf' }),
+      new File([], 'Work order summary.pdf', { type: 'application/pdf' }),
+    ])
+  }, [workorderId])
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (moreActionsRef.current && !moreActionsRef.current.contains(e.target as Node)) {
@@ -233,7 +242,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   style={{ color: '#1F271B' }}
                 >
                   <FiMail size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
-                  <span>Send Job Follow (NEW)</span>
+                  <span>Send Job Follow</span>
                 </button>
                 <button
                   onClick={() => {
@@ -395,103 +404,6 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 )}
               </div>
 
-            </div>
-          </div>
-
-          {/* Work order Report (Job Form) */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Work order Report (Job Form)</h2>
-            {!jobReportPdfUrl ? (
-              <div className="flex flex-col sm:flex-row items-start gap-3">
-                <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
-                  Create a job report with photos, notes, and digital signature. PDF is stored here and can be sent to the customer.
-                </p>
-                <button
-                  onClick={() => setIsCreateJobReportModalOpen(true)}
-                  className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 shrink-0"
-                  style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
-                >
-                  <FiFileText size={14} />
-                  Create Job report
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href={jobReportPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-medium"
-                    style={{ color: '#28AFB0' }}
-                  >
-                    <FiFileText size={16} />
-                    View PDF
-                  </a>
-                </div>
-                <button
-                  onClick={() => setSendEmailModalType('work-order-report')}
-                  className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5"
-                  style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F0FDFA' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
-                >
-                  <FiMail size={14} />
-                  {jobReportSentAt ? 'Resend work order report' : 'Send work order report'}
-                </button>
-                {jobReportSentAt && (
-                  <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-                    Sent {format(new Date(jobReportSentAt), 'MMM dd, yyyy')}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Work report (Tally) – report created in Tally, fetch and send from here */}
-          <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Work report (Tally)</h2>
-            <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>
-              Work reports are created in Tally (outside this platform). Use the button below to fetch the latest work report from Tally and send it to the customer.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={async () => {
-                  setIsFetchingTallyWorkReport(true)
-                  try {
-                    // In production: call your API that fetches the work report from Tally for this workorder
-                    await new Promise(resolve => setTimeout(resolve, 1500))
-                    setSendingTallyWorkReport(true)
-                    setSendEmailModalType('work-order-report')
-                  } finally {
-                    setIsFetchingTallyWorkReport(false)
-                  }
-                }}
-                disabled={isFetchingTallyWorkReport}
-                className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 shrink-0 disabled:opacity-60"
-                style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                onMouseEnter={(e) => { if (!isFetchingTallyWorkReport) e.currentTarget.style.backgroundColor = '#1E8A8B' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
-              >
-                {isFetchingTallyWorkReport ? (
-                  <>
-                    <FiClock size={14} className="animate-pulse" />
-                    Fetching from Tally…
-                  </>
-                ) : (
-                  <>
-                    <FiMail size={14} />
-                    Send work report
-                  </>
-                )}
-              </button>
-              {tallyWorkReportSentAt && (
-                <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-                  Last sent {format(new Date(tallyWorkReportSentAt), 'MMM dd, yyyy')}
-                </p>
-              )}
             </div>
           </div>
 
@@ -1331,7 +1243,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 )}
               </div>
               {/* Invoice WhatsApp status */}
-              <div className="flex justify-between items-center py-2.5 last:pb-0">
+              <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice WhatsApp status</span>
                 <span
                   className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1342,6 +1254,47 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 >
                   {workorder.invoiceWhatsappStatus || 'Not sent'}
                 </span>
+              </div>
+              {/* Last Work REPORT */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Last Work REPORT</span>
+                {jobReportPdfUrl ? (
+                  <a href={jobReportPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
+                    <FiFileText size={12} />
+                    <span>Job report.pdf</span>
+                  </a>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>—</span>
+                )}
+              </div>
+              {/* Work report sent */}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Work report sent</span>
+                {(() => {
+                  const a = jobReportSentAt ? new Date(jobReportSentAt).getTime() : 0
+                  const b = tallyWorkReportSentAt ? new Date(tallyWorkReportSentAt).getTime() : 0
+                  const latest = a >= b ? jobReportSentAt : tallyWorkReportSentAt
+                  return latest ? (
+                    <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
+                      <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                      {format(new Date(latest), 'MMM dd, yyyy')}
+                    </span>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                  )
+                })()}
+              </div>
+              {/* Job Follow sent */}
+              <div className="flex justify-between items-center py-2.5 last:pb-0">
+                <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Job Follow sent</span>
+                {(workorder as any).jobFollowSentAt ? (
+                  <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
+                    <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                    {format(new Date((workorder as any).jobFollowSentAt), 'MMM dd, yyyy')}
+                  </span>
+                ) : (
+                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                )}
               </div>
             </div>
           </div>
@@ -1950,8 +1903,14 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 alert('Work order report sent successfully!')
               }
               setSendEmailModalType(null)
+            } else if (sendEmailModalType === 'job-follow') {
+              const sentAt = new Date().toISOString()
+              const wo = mockWorkorders.find(w => w.id === workorderId)
+              if (wo) (wo as Record<string, unknown>).jobFollowSentAt = sentAt
+              setSendEmailModalType(null)
+              alert('Job follow-up sent successfully!')
             } else {
-              alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : sendEmailModalType === 'invoice' ? 'Invoice sent successfully!' : 'Job follow-up sent successfully!')
+              alert(sendEmailModalType === 'quote' ? 'Quote sent successfully!' : 'Invoice sent successfully!')
             }
           }}
         />
