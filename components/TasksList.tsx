@@ -100,9 +100,9 @@ export default function TasksList() {
                   <p className="text-sm font-medium text-neutral-dark">{task.title}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ml-2 ${
-                  task.status === 'Completed' ? 'bg-secondary/20 text-secondary' :
-                  task.status === 'In Progress' ? 'bg-secondary/20 text-secondary' :
-                  'bg-tertiary/20 text-tertiary'
+                  task.status === 'Completed' ? 'bg-secondary/20 text-secondary-dark' :
+                  task.status === 'In Progress' ? 'bg-secondary/20 text-secondary-dark' :
+                  'bg-tertiary/20 text-tertiary-dark'
                 }`}>
                   {task.status === 'Completed' ? <FiCheckCircle size={14} className="inline mr-1" /> : <FiClock size={14} className="inline mr-1" />}
                   {task.status}
@@ -121,9 +121,9 @@ export default function TasksList() {
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-neutral-dark/70">Priority:</span>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    task.priority === 'High' ? 'bg-tertiary/20 text-tertiary' :
-                    task.priority === 'Medium' ? 'bg-secondary/20 text-secondary' :
-                    'bg-neutral-dark/20 text-neutral-dark'
+                    task.priority === 'High' ? 'bg-tertiary/20 text-tertiary-dark' :
+                    task.priority === 'Medium' ? 'bg-secondary/20 text-secondary-dark' :
+                    'bg-neutral-dark/10 text-neutral-dark'
                   }`}>
                     {task.priority}
                   </span>
@@ -160,18 +160,18 @@ export default function TasksList() {
                   <td className="px-4 py-3 text-sm text-neutral-dark/70">{task.dueDate}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      task.priority === 'High' ? 'bg-tertiary/20 text-tertiary' :
-                      task.priority === 'Medium' ? 'bg-secondary/20 text-secondary' :
-                      'bg-neutral-dark/20 text-neutral-dark'
+                      task.priority === 'High' ? 'bg-tertiary/20 text-tertiary-dark' :
+                      task.priority === 'Medium' ? 'bg-secondary/20 text-secondary-dark' :
+                      'bg-neutral-dark/10 text-neutral-dark'
                     }`}>
                       {task.priority}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${
-                      task.status === 'Completed' ? 'bg-secondary/20 text-secondary' :
-                      task.status === 'In Progress' ? 'bg-secondary/20 text-secondary' :
-                      'bg-tertiary/20 text-tertiary'
+                      task.status === 'Completed' ? 'bg-secondary/20 text-secondary-dark' :
+                      task.status === 'In Progress' ? 'bg-secondary/20 text-secondary-dark' :
+                      'bg-tertiary/20 text-tertiary-dark'
                     }`}>
                       {task.status === 'Completed' ? <FiCheckCircle size={14} /> : <FiClock size={14} />}
                       {task.status}

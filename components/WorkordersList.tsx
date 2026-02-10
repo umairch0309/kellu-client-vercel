@@ -86,24 +86,28 @@ export default function WorkordersList() {
     router.push(`/workorders/${workorderId}`)
   }
 
+  // Light theme badges: light bg + darker text (matches /tasks style)
   const getStatusColor = (status: string, type: 'quote' | 'job' | 'invoice') => {
+    const teal = { bg: 'rgba(40, 175, 176, 0.2)', text: '#1E8A8B' }
+    const purple = { bg: 'rgba(176, 132, 204, 0.2)', text: '#8B6AA3' }
+    const blue = { bg: 'rgba(43, 80, 170, 0.2)', text: '#1F3A7A' }
+    const gray = { bg: '#F3F4F6', text: '#1F271B' }
     if (type === 'quote') {
-      if (status === 'approved') return { bg: '#28AFB0', text: 'white' }
-      if (status === 'waiting for approval') return { bg: '#B084CC', text: 'white' }
-      return { bg: '#EAEBED', text: '#1F271B' }
+      if (status === 'approved') return teal
+      if (status === 'waiting for approval') return purple
+      return gray
     }
     if (type === 'job') {
-      if (status === 'Completed') return { bg: '#28AFB0', text: 'white' }
-      if (status === 'In Progress') return { bg: '#28AFB0', text: 'white' }
-      if (status === 'Scheduled') return { bg: '#2B50AA', text: 'white' }
-      return { bg: '#EAEBED', text: '#1F271B' }
+      if (status === 'Completed' || status === 'In Progress') return teal
+      if (status === 'Scheduled') return blue
+      return gray
     }
     if (type === 'invoice') {
-      if (status === 'paid') return { bg: '#28AFB0', text: 'white' }
-      if (status === 'waiting for payment') return { bg: '#B084CC', text: 'white' }
-      return { bg: '#EAEBED', text: '#1F271B' }
+      if (status === 'paid') return teal
+      if (status === 'waiting for payment') return purple
+      return gray
     }
-    return { bg: '#EAEBED', text: '#1F271B' }
+    return gray
   }
 
   return (

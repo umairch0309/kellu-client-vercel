@@ -124,9 +124,9 @@ export default function InvoicesList() {
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-neutral-dark/70">Status:</span>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    invoice.status === 'paid' ? 'bg-secondary/20 text-secondary' :
-                    invoice.status === 'waiting for payment' ? 'bg-tertiary/20 text-tertiary' :
-                    'bg-neutral-dark/20 text-neutral-dark'
+                    invoice.status === 'paid' ? 'bg-secondary/20 text-secondary-dark' :
+                    invoice.status === 'waiting for payment' ? 'bg-tertiary/20 text-tertiary-dark' :
+                    'bg-neutral-dark/10 text-neutral-dark'
                   }`}>
                     {invoice.status}
                   </span>

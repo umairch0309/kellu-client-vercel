@@ -60,10 +60,11 @@ export default function QuotesList() {
     router.push(`/workorders/${workorderId}`)
   }
 
+  // Light theme badges: light bg + darker text (matches /tasks style)
   const getStatusColor = (status: string) => {
-    if (status === 'approved') return { bg: '#28AFB0', text: 'white' }
-    if (status === 'waiting for approval') return { bg: '#B084CC', text: 'white' }
-    return { bg: '#EAEBED', text: '#1F271B' }
+    if (status === 'approved') return { bg: 'rgba(40, 175, 176, 0.2)', text: '#1E8A8B' }
+    if (status === 'waiting for approval') return { bg: 'rgba(176, 132, 204, 0.2)', text: '#8B6AA3' }
+    return { bg: '#F3F4F6', text: '#1F271B' }
   }
 
   return (
@@ -282,7 +283,7 @@ export default function QuotesList() {
                         {quote.dateSent ? format(new Date(quote.dateSent), 'MMM dd, yyyy') : '—'}
                       </td>
                       <td className="py-2 px-2">
-                        <span className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ 
+                        <span className="inline-block px-2 py-1 rounded-full text-xs font-medium" style={{ 
                           backgroundColor: statusColors.bg,
                           color: statusColors.text
                         }}>

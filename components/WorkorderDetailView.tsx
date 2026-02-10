@@ -302,27 +302,27 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <div className="grid grid-cols-3 gap-3 mb-4 pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
                 <div>
                   <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote Status</p>
-                  <span className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ 
-                    backgroundColor: workorder.quoteStatus === 'approved' ? '#D1FAE5' : workorder.quoteStatus === 'waiting for approval' ? '#FEF3C7' : '#F3F4F6',
-                    color: workorder.quoteStatus === 'approved' ? '#065F46' : workorder.quoteStatus === 'waiting for approval' ? '#92400E' : '#1F271B'
+                  <span className="inline-block px-2 py-1 rounded-full text-xs font-medium" style={{ 
+                    backgroundColor: workorder.quoteStatus === 'approved' ? 'rgba(40, 175, 176, 0.2)' : workorder.quoteStatus === 'waiting for approval' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                    color: workorder.quoteStatus === 'approved' ? '#1E8A8B' : workorder.quoteStatus === 'waiting for approval' ? '#8B6AA3' : '#1F271B'
                   }}>
                     {workorder.quoteStatus}
                   </span>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Job Status</p>
-                  <span className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ 
-                    backgroundColor: workorder.jobStatus === 'Completed' ? '#D1FAE5' : workorder.jobStatus === 'In Progress' ? '#DBEAFE' : '#F3F4F6',
-                    color: workorder.jobStatus === 'Completed' ? '#065F46' : workorder.jobStatus === 'In Progress' ? '#1E40AF' : '#1F271B'
+                  <span className="inline-block px-2 py-1 rounded-full text-xs font-medium" style={{ 
+                    backgroundColor: workorder.jobStatus === 'Completed' || workorder.jobStatus === 'In Progress' ? 'rgba(40, 175, 176, 0.2)' : workorder.jobStatus === 'Scheduled' ? 'rgba(43, 80, 170, 0.2)' : '#F3F4F6',
+                    color: workorder.jobStatus === 'Completed' || workorder.jobStatus === 'In Progress' ? '#1E8A8B' : workorder.jobStatus === 'Scheduled' ? '#1F3A7A' : '#1F271B'
                   }}>
                     {workorder.jobStatus}
                   </span>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice Status</p>
-                  <span className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ 
-                    backgroundColor: isInvoicePaid ? '#D1FAE5' : workorder.invoiceStatus === 'waiting for payment' ? '#FEF3C7' : '#F3F4F6',
-                    color: isInvoicePaid ? '#065F46' : workorder.invoiceStatus === 'waiting for payment' ? '#92400E' : '#1F271B'
+                  <span className="inline-block px-2 py-1 rounded-full text-xs font-medium" style={{ 
+                    backgroundColor: isInvoicePaid ? 'rgba(40, 175, 176, 0.2)' : workorder.invoiceStatus === 'waiting for payment' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                    color: isInvoicePaid ? '#1E8A8B' : workorder.invoiceStatus === 'waiting for payment' ? '#8B6AA3' : '#1F271B'
                   }}>
                     {isInvoicePaid ? 'paid' : workorder.invoiceStatus}
                   </span>
@@ -1230,10 +1230,10 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Quote WhatsApp status</span>
                 <span
-                  className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                  className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
                   style={{
-                    backgroundColor: workorder.quoteWhatsappStatus === 'sent' ? '#059669' : '#F3F4F6',
-                    color: workorder.quoteWhatsappStatus === 'sent' ? '#fff' : '#1F271B',
+                    backgroundColor: workorder.quoteWhatsappStatus === 'sent' ? 'rgba(40, 175, 176, 0.2)' : '#F3F4F6',
+                    color: workorder.quoteWhatsappStatus === 'sent' ? '#1E8A8B' : '#1F271B',
                   }}
                 >
                   {workorder.quoteWhatsappStatus || 'Not sent'}
@@ -1267,10 +1267,10 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <div className="flex justify-between items-center py-2.5 last:pb-0">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice WhatsApp status</span>
                 <span
-                  className="inline-block px-2 py-0.5 rounded text-xs font-medium"
+                  className="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
                   style={{
-                    backgroundColor: workorder.invoiceWhatsappStatus === 'sent' ? '#059669' : '#F3F4F6',
-                    color: workorder.invoiceWhatsappStatus === 'sent' ? '#fff' : '#1F271B',
+                    backgroundColor: workorder.invoiceWhatsappStatus === 'sent' ? 'rgba(40, 175, 176, 0.2)' : '#F3F4F6',
+                    color: workorder.invoiceWhatsappStatus === 'sent' ? '#1E8A8B' : '#1F271B',
                   }}
                 >
                   {workorder.invoiceWhatsappStatus || 'Not sent'}
