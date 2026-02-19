@@ -186,6 +186,7 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
               Address
             </h3>
             <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.85 }}>Address</label>
               <input
                 type="text"
                 name="address"
@@ -251,15 +252,18 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
               </span>
               Notes
             </h3>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              rows={3}
-              placeholder="Internal notes about this client (optional)"
-              className={`${inputBase} resize-none ${focusRing}`}
-              style={inputStyle}
-            />
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.85 }}>Notes</label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                rows={3}
+                placeholder="Internal notes about this client (optional)"
+                className={`${inputBase} resize-none ${focusRing}`}
+                style={inputStyle}
+              />
+            </div>
           </section>
         </div>
 

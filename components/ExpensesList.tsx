@@ -14,7 +14,7 @@ export default function ExpensesList() {
 
   const filteredExpenses = mockExpenses.filter(expense => {
     const term = searchTerm.toLowerCase().trim()
-    const workorder = expense.linkedWorkorder ? mockWorkorders.find(wo => wo.id === expense.linkedWorkorder) : null
+      const workorder = expense.linkedWorkorder ? mockWorkorders.find(wo => wo.id === expense.linkedWorkorder) : null
     const client = workorder ? mockClients.find(c => c.id === workorder.clientId) : null
 
     const matchesSearch = !term ||
@@ -87,8 +87,8 @@ export default function ExpensesList() {
             </div>
             <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]">
               <FiSearch className="absolute left-2.5 top-1/2 transform -translate-y-1/2" size={14} style={{ color: '#1F271B', opacity: 0.5 }} />
-              <input
-                type="text"
+            <input
+              type="text"
                 placeholder="Search by item, details, invoice #, workorder, or client..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -102,9 +102,9 @@ export default function ExpensesList() {
                   e.currentTarget.style.borderColor = '#EAEBED'
                   e.currentTarget.style.boxShadow = 'none'
                 }}
-              />
-            </div>
+            />
           </div>
+        </div>
         </div>
         {filteredExpenses.length > 0 ? (
           <div className="overflow-x-auto">

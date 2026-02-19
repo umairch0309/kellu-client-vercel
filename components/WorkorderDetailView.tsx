@@ -100,8 +100,8 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
 
   useEffect(() => {
     if (!workorder) return
-    setEditedLineItems([...workorder.lineItems])
-    setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
+      setEditedLineItems([...workorder.lineItems])
+      setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
     setQuoteClientMessage((workorder as any).quoteClientMessage ?? quoteSettings?.clientMessage ?? '')
     setQuoteTermsAndConditions((workorder as any).quoteTermsAndConditions ?? quoteSettings?.termsAndConditions ?? '')
     setInvoiceClientMessage((workorder as any).invoiceClientMessage ?? invoiceSettings?.clientMessage ?? '')
@@ -211,61 +211,61 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             </button>
             {isMoreActionsOpen && (
               <div className="absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[220px]" style={{ borderColor: '#EAEBED' }}>
-                <button
+                <button 
                   onClick={() => {
                     setSendEmailModalType('quote')
                     setIsMoreActionsOpen(false)
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
                   style={{ color: '#1F271B' }}
                 >
                   <FiSend size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
                   <span>Send Quote</span>
                 </button>
-                <button
+                <button 
                   onClick={() => {
                     setSendEmailModalType('invoice')
                     setIsMoreActionsOpen(false)
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
                   style={{ color: '#1F271B' }}
                 >
                   <FiDollarSign size={16} style={{ color: '#2B50AA', flexShrink: 0 }} />
                   <span>Send Invoice</span>
                 </button>
-                <button
+                <button 
                   onClick={() => {
                     setSendEmailModalType('job-follow')
                     setIsMoreActionsOpen(false)
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
                   style={{ color: '#1F271B' }}
                 >
                   <FiMail size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
                   <span>Send Job Follow</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setIsCreateJobReportModalOpen(true)
-                    setIsMoreActionsOpen(false)
-                  }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiFileText size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Create Job report</span>
-                </button>
-                <button
+                <button 
                   onClick={() => {
                     const url = `${TALLY_WORK_REPORT_BASE_URL}${TALLY_WORK_REPORT_BASE_URL.includes('?') ? '&' : '?'}workorder=${workorderId}`
                     window.open(url, '_blank', 'noopener,noreferrer')
                     setIsMoreActionsOpen(false)
                   }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3"
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
                   style={{ color: '#1F271B' }}
                 >
                   <FiExternalLink size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
                   <span>Create Work report</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setSendEmailModalType('work-order-report')
+                    setIsMoreActionsOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
+                  style={{ color: '#1F271B' }}
+                >
+                  <FiFileText size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
+                  <span>Send Work report</span>
                 </button>
               </div>
             )}
@@ -410,40 +410,40 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
           {/* Grouped: Profitability + Line Items + Expenses — grey outer, white div per section */}
           <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
             {/* Profitability Section — white card */}
-            {showProfitability && (
+          {showProfitability && (
               <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <button
-                    onClick={() => setShowProfitability(false)}
-                    className="text-xs font-medium flex items-center gap-1 transition-colors"
-                    style={{ color: '#1F271B', opacity: 0.7 }}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setShowProfitability(false)}
+                  className="text-xs font-medium flex items-center gap-1 transition-colors"
+                  style={{ color: '#1F271B', opacity: 0.7 }}
                     onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
                     onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
-                  >
-                    Hide Profitability
-                    <FiChevronUp size={12} />
-                  </button>
-                </div>
+                >
+                  Hide Profitability
+                  <FiChevronUp size={12} />
+                </button>
+              </div>
                 <div className="border-b pb-4 mb-4" style={{ borderColor: '#EAEBED' }} />
                 <div className="flex flex-wrap items-start gap-6 md:gap-8">
-                  <div>
-                    <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
-                      {profit < 0 ? '-' : ''}{profitMargin}%
-                    </p>
-                    <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
-                  </div>
+                <div>
+                  <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
+                    {profit < 0 ? '-' : ''}{profitMargin}%
+                  </p>
+                  <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
+                </div>
                   <div className="flex flex-wrap gap-6 md:gap-8">
                     <div>
                       <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Total price</p>
                       <p className="text-sm font-bold" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</p>
-                    </div>
+                  </div>
                     <div className="flex items-center gap-1.5">
                       <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
                       <div>
                         <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Line Item Cost</p>
                         <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalLineItemCost.toFixed(2)}</p>
-                      </div>
-                    </div>
+                  </div>
+                  </div>
                     <div className="flex items-center gap-1.5">
                       <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
                       <div>
@@ -457,11 +457,11 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                         <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Expenses</p>
                         <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalExpenses.toFixed(2)}</p>
                       </div>
-                    </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
             {/* Line Items Section — white card */}
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
@@ -495,24 +495,24 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 <div className="space-y-3">
                   <div className="relative">
                     <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Name <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={newLineItem.name}
-                      onChange={(e) => {
-                        setNewLineItem({ ...newLineItem, name: e.target.value })
-                        setLineItemError('')
-                      }}
+                  <input
+                    type="text"
+                    value={newLineItem.name}
+                    onChange={(e) => {
+                      setNewLineItem({ ...newLineItem, name: e.target.value })
+                      setLineItemError('')
+                    }}
                       placeholder="Type to search materials..."
                       className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all ${lineItemError ? 'border-red-500' : ''}`}
                       style={{ borderColor: lineItemError ? '#DC2626' : '#EAEBED', color: '#1F271B' }}
-                      onFocus={(e) => {
+                    onFocus={(e) => {
                         if (!lineItemError) { e.currentTarget.style.borderColor = '#28AFB0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)' }
-                      }}
-                      onBlur={(e) => {
+                    }}
+                    onBlur={(e) => {
                         if (!lineItemError) { e.currentTarget.style.borderColor = '#EAEBED'; e.currentTarget.style.boxShadow = 'none' }
-                      }}
-                    />
-                    {lineItemError && (
+                    }}
+                  />
+                  {lineItemError && (
                       <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#DC2626' }}><FiInfo size={12} />{lineItemError}</p>
                     )}
                     {(() => {
@@ -550,8 +550,8 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                               <FiPlus size={16} style={{ color: '#28AFB0' }} />
                               Create new item
                             </button>
-                          )}
-                        </div>
+                  )}
+                </div>
                       )
                     })()}
                   </div>
@@ -569,48 +569,48 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   <div className="grid grid-cols-4 gap-2">
                     <div>
                       <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quantity</label>
-                      <input
-                        type="number"
-                        value={newLineItem.quantity}
+                    <input
+                      type="number"
+                      value={newLineItem.quantity}
                         onChange={(e) => setNewLineItem({ ...newLineItem, quantity: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        className="w-full px-2 py-2 border rounded text-sm text-center"
-                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                      />
-                    </div>
-                    <div>
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2 py-2 border rounded text-sm text-center"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                    />
+                  </div>
+                  <div>
                       <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit cost</label>
-                      <input
-                        type="number"
-                        value={newLineItem.unitCost}
+                    <input
+                      type="number"
+                      value={newLineItem.unitCost}
                         onChange={(e) => setNewLineItem({ ...newLineItem, unitCost: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        className="w-full px-2 py-2 border rounded text-sm text-center"
-                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                      />
-                    </div>
-                    <div>
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2 py-2 border rounded text-sm text-center"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                    />
+                  </div>
+                  <div>
                       <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit price</label>
-                      <input
-                        type="number"
-                        value={newLineItem.unitPrice}
+                    <input
+                      type="number"
+                      value={newLineItem.unitPrice}
                         onChange={(e) => setNewLineItem({ ...newLineItem, unitPrice: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        className="w-full px-2 py-2 border rounded text-sm text-center"
-                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                      />
-                    </div>
-                    <div>
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2 py-2 border rounded text-sm text-center"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                    />
+                  </div>
+                  <div>
                       <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Total</label>
-                      <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                        Rs{(newLineItem.quantity * newLineItem.unitPrice).toFixed(2)}
-                      </div>
+                    <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                      Rs{(newLineItem.quantity * newLineItem.unitPrice).toFixed(2)}
                     </div>
                   </div>
                 </div>
+                    </div>
                 <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
                   <button
                     onClick={() => { setIsAddLineItemOpen(false); setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 }); setLineItemError('') }}
@@ -653,7 +653,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                           <span style={{ color: '#1F271B', opacity: 0.7 }}>Total: <span className="font-semibold">Rs{item.total.toFixed(2)}</span></span>
                         </div>
                       </div>
-                      <button
+                        <button
                         type="button"
                         onClick={() => setEditedLineItems(editedLineItems.filter((_, i) => i !== index))}
                         className="p-2 rounded transition-colors"
@@ -663,7 +663,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                         title="Delete line"
                       >
                         <FiTrash2 size={18} />
-                      </button>
+                        </button>
                     </div>
                   </div>
                 ))}
@@ -701,20 +701,20 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                         <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
                         <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2)}</td>
                       </tr>
-                      <tr>
-                        <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>
+                        <tr>
+                          <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>
                           Discount{workorder.discount > 0 ? ` (${workorder.discountType === 'percentage' ? `${workorder.discount}%` : 'Amount'})` : ''}
-                        </td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
+                          </td>
+                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
+                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
                           {workorder.discount > 0
                             ? `-Rs${workorder.discountType === 'percentage'
-                                ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
+                              ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
                                 : workorder.discount.toFixed(2)}`
                             : '—'}
-                        </td>
-                      </tr>
-                      <tr>
+                          </td>
+                        </tr>
+                        <tr>
                           <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Tax ({companyTaxRatePercent}%)</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
@@ -736,41 +736,41 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 </div>
               </div>
             )}
-            </div>
+          </div>
 
             {/* Expenses Section — white card */}
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Expenses</h2>
-                <button
-                  onClick={() => {
-                    setNewExpense({
-                      date: new Date().toISOString().split('T')[0],
-                      itemName: '',
-                      details: '',
-                      total: 0,
-                      linkedWorkorder: workorderId || null,
-                      invoiceNumber: '',
-                      attachment: null,
-                    })
-                    setIsAddExpenseOpen(true)
-                  }}
-                  className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
-                  style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F0FDFA'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
-                >
-                  <FiPlus size={12} />
-                  <span>New Expense</span>
-                </button>
-              </div>
-              <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>
-                Get an accurate picture of various job costs by recording expenses
-              </p>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Expenses</h2>
+              <button
+                onClick={() => {
+                  setNewExpense({
+                    date: new Date().toISOString().split('T')[0],
+                    itemName: '',
+                    details: '',
+                    total: 0,
+                    linkedWorkorder: workorderId || null,
+                    invoiceNumber: '',
+                    attachment: null,
+                  })
+                  setIsAddExpenseOpen(true)
+                }}
+                className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
+                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F0FDFA'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                <FiPlus size={12} />
+                <span>New Expense</span>
+              </button>
+            </div>
+            <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>
+              Get an accurate picture of various job costs by recording expenses
+            </p>
             </div>
           </div>
 
@@ -779,6 +779,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Quote</h2>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Client message</h3>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Client message</label>
               <textarea
                 value={quoteClientMessage}
                 onChange={(e) => setQuoteClientMessage(e.target.value)}
@@ -798,6 +799,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             </div>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Contract / Disclaimer</h3>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Contract / Disclaimer</label>
               <textarea
                 value={quoteTermsAndConditions}
                 onChange={(e) => setQuoteTermsAndConditions(e.target.value)}
@@ -842,7 +844,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
                 >
                   Save
-                </button>
+              </button>
               </div>
             </div>
           </div>
@@ -852,6 +854,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Invoice</h2>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Client message</h3>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Client message</label>
               <textarea
                 value={invoiceClientMessage}
                 onChange={(e) => setInvoiceClientMessage(e.target.value)}
@@ -871,6 +874,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             </div>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Contract / Disclaimer</h3>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Contract / Disclaimer</label>
               <textarea
                 value={invoiceTermsAndConditions}
                 onChange={(e) => setInvoiceTermsAndConditions(e.target.value)}
@@ -896,9 +900,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   style={{ accentColor: '#28AFB0' }}
                 />
                 <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Apply to all future invoices</span>
-              </label>
+                  </label>
               <div className="flex justify-end mt-3">
-                <button
+                          <button
                   type="button"
                   onClick={() => {
                     if (applyToAllFutureInvoices) {
@@ -921,14 +925,15 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
                 >
                   Save
-                </button>
+                          </button>
+                </div>
               </div>
-            </div>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Internal notes (invoice)</h3>
               <p className="text-xs mb-2" style={{ color: '#1F271B', opacity: 0.6 }}>
                 Visible only to your team. Not sent to the client.
               </p>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Internal notes</label>
               <textarea
                 value={invoiceInternalNote}
                 onChange={(e) => setInvoiceInternalNote(e.target.value)}
@@ -945,7 +950,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               />
-            </div>
+              </div>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Attachments (invoice)</h3>
               <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
@@ -1155,6 +1160,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             <p className="text-xs mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
               Internal notes will only be seen by your team
             </p>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Internal notes</label>
             <textarea
               value={internalNote}
               onChange={(e) => setInternalNote(e.target.value)}
@@ -1192,19 +1198,19 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 ) : (
                   <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>—</span>
                 )}
-              </div>
+                </div>
               {/* Quote sent */}
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Quote sent</span>
-                {workorder.quoteDateSent ? (
+                  {workorder.quoteDateSent ? (
                   <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
-                    <FiCheckCircle size={12} style={{ color: '#059669' }} />
-                    {format(new Date(workorder.quoteDateSent), 'MMM dd, yyyy')}
-                  </span>
-                ) : (
-                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
-                )}
-              </div>
+                      <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                        {format(new Date(workorder.quoteDateSent), 'MMM dd, yyyy')}
+                      </span>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                  )}
+                </div>
               {/* Quote WhatsApp status */}
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Quote WhatsApp status</span>
@@ -1233,15 +1239,15 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               {/* Invoice sent */}
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice sent</span>
-                {workorder.invoiceDateSent ? (
+                  {workorder.invoiceDateSent ? (
                   <span className="text-xs flex items-center gap-1" style={{ color: '#1F271B' }}>
-                    <FiCheckCircle size={12} style={{ color: '#059669' }} />
-                    {format(new Date(workorder.invoiceDateSent), 'MMM dd, yyyy')}
-                  </span>
-                ) : (
-                  <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
-                )}
-              </div>
+                      <FiCheckCircle size={12} style={{ color: '#059669' }} />
+                        {format(new Date(workorder.invoiceDateSent), 'MMM dd, yyyy')}
+                      </span>
+                  ) : (
+                    <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
+                  )}
+                </div>
               {/* Invoice WhatsApp status */}
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Invoice WhatsApp status</span>
@@ -1266,7 +1272,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 ) : (
                   <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>—</span>
                 )}
-              </div>
+                </div>
               {/* Work report sent */}
               <div className="flex justify-between items-center py-2.5">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Work report sent</span>
@@ -1283,7 +1289,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                     <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
                   )
                 })()}
-              </div>
+                </div>
               {/* Job Follow sent */}
               <div className="flex justify-between items-center py-2.5 last:pb-0">
                 <span className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Job Follow sent</span>
@@ -1295,7 +1301,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 ) : (
                   <span className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>Not sent</span>
                 )}
-              </div>
+                </div>
             </div>
           </div>
 

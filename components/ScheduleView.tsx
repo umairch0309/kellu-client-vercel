@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { 
@@ -8,6 +8,7 @@ import {
   FiChevronLeft, 
   FiChevronRight, 
   FiX,
+  FiCheck,
   FiCheckCircle,
   FiUsers,
   FiPlus,
@@ -16,6 +17,8 @@ import {
 import { format, startOfWeek, addDays, isToday, isSameDay, startOfDay, getHours, getMinutes, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, getDay, subMonths, addMonths } from 'date-fns'
 import { mockWorkorders, mockTeamMembers } from '@/data/mockData'
 import AddWorkorderModal from './AddWorkorderModal'
+
+type ScheduleItem = typeof mockWorkorders[0]
 import Sidebar from './Sidebar'
 import Header from './Header'
 
@@ -35,39 +38,96 @@ export default function ScheduleView() {
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(['visits', 'tasks']))
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false)
   const [typeSearchTerm, setTypeSearchTerm] = useState('')
-  const [teamFilter, setTeamFilter] = useState<string>('all')
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
   const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false)
   const [teamSearchTerm, setTeamSearchTerm] = useState('')
+  const [isEventDetailAssignOpen, setIsEventDetailAssignOpen] = useState(false)
+  const [eventDetailAssignSearchTerm, setEventDetailAssignSearchTerm] = useState('')
   const [showUnscheduled, setShowUnscheduled] = useState(true)
   const [showUnscheduledTooltip, setShowUnscheduledTooltip] = useState(false)
+  const [dayViewAnytimeExpanded, setDayViewAnytimeExpanded] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [datePickerMonth, setDatePickerMonth] = useState(new Date())
   const datePickerRef = useRef<HTMLDivElement>(null)
+  const unscheduleButtonRef = useRef<HTMLButtonElement>(null)
+  const [unscheduleTooltipStyle, setUnscheduleTooltipStyle] = useState<{ top: number; left: number; above: boolean } | null>(null)
+
+  // Editable work orders for drag/resize (initialized from mock)
+  const [workOrders, setWorkOrders] = useState<ScheduleItem[]>(() => JSON.parse(JSON.stringify(mockWorkorders)))
+  const updateWorkOrder = (id: number, updates: Partial<ScheduleItem>) => {
+    setWorkOrders(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w))
+  }
+
+  // Resize state: which item and which edge (for duration change)
+  const [resizeState, setResizeState] = useState<{
+    itemId: number
+    edge: 'top' | 'bottom'
+    startY: number
+    startEndMinutes: number
+    startStartMinutes: number
+    scheduleDay: string
+    pixelsPerHour: number
+  } | null>(null)
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }) // Monday start
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-  // Hours from 8 AM to 6 PM (to match the image)
-  const hours = Array.from({ length: 11 }, (_, i) => i + 8)
-  const currentHour = getHours(new Date())
-  const currentMinute = getMinutes(new Date())
+  // Full 24-hour range: 0:00 to 23:00
+  const hours = Array.from({ length: 24 }, (_, i) => i)
 
-  // Get scheduled items
-  const scheduledItems = mockWorkorders.filter(item => {
+  // Live "now" for current-time indicator (updates every minute)
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60 * 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Unscheduled tooltip: position in viewport so it's never clipped (portal + fixed)
+  const TOOLTIP_GAP = 6
+  const TOOLTIP_EST_HEIGHT = 36
+  const TOOLTIP_EST_WIDTH = 100
+  useLayoutEffect(() => {
+    if (!showUnscheduledTooltip || !unscheduleButtonRef.current || typeof window === 'undefined') {
+      setUnscheduleTooltipStyle(null)
+      return
+    }
+    const rect = unscheduleButtonRef.current.getBoundingClientRect()
+    const viewportPadding = 8
+    const spaceAbove = rect.top
+    const showAbove = spaceAbove >= TOOLTIP_EST_HEIGHT + TOOLTIP_GAP + viewportPadding
+    let left = rect.left + rect.width / 2
+    left = Math.max(viewportPadding + TOOLTIP_EST_WIDTH / 2, Math.min(window.innerWidth - viewportPadding - TOOLTIP_EST_WIDTH / 2, left))
+    const above = showAbove
+    let top = above
+      ? rect.top - TOOLTIP_EST_HEIGHT - TOOLTIP_GAP
+      : rect.bottom + TOOLTIP_GAP
+    if (above) {
+      top = Math.max(viewportPadding, top)
+    } else {
+      top = Math.min(window.innerHeight - viewportPadding - TOOLTIP_EST_HEIGHT, top)
+    }
+    setUnscheduleTooltipStyle({ top, left, above })
+  }, [showUnscheduledTooltip])
+
+  const currentHour = getHours(now)
+  const currentMinute = getMinutes(now)
+  const currentTimeTopDay = currentHour * 60 + (currentMinute / 60) * 60 // px per hour = 60 in day view (0:00 = 0)
+  const currentTimeTopWeek = currentHour * 48 + (currentMinute / 60) * 48 // px per hour = 48 in week view
+  const showCurrentTimeDay = isToday(currentDate)
+  const showCurrentTimeWeek = (day: Date) => isToday(day)
+
+  // Get scheduled items from editable work orders
+  const scheduledItems = workOrders.filter(item => {
     // Type filter: check if item type matches any of the selected types
     // If all types are selected (size === 2) or none selected (size === 0), show all items
     const matchesType = selectedTypes.size === 0 || selectedTypes.size === 2 || ((item as any).type && selectedTypes.has((item as any).type))
     
-    // Team filter
+    // Team filter (multiselect: none selected = all; otherwise match any selected)
     let matchesTeam = true
-    if (teamFilter === 'all') {
-      matchesTeam = true
-    } else if (teamFilter === 'unassigned') {
-      matchesTeam = !item.assignedTeamMember || item.assignedTeamMember === ''
-    } else {
-      matchesTeam = item.assignedTeamMember === teamFilter
+    if (selectedTeams.size > 0) {
+      matchesTeam = (selectedTeams.has('unassigned') && (!item.assignedTeamMember || item.assignedTeamMember === '')) ||
+        (item.assignedTeamMember && selectedTeams.has(item.assignedTeamMember))
     }
-    
     return matchesType && matchesTeam
   })
 
@@ -96,10 +156,10 @@ export default function ScheduleView() {
     setTypeFilter('all')
   }
 
-  // Filter options based on search
+  // Filter options based on search (full color circle; selection = checkmark overlay)
   const typeOptions = [
-    { value: 'visits', label: 'Workorders', color: 'border-2 border-green-500 bg-transparent' },
-    { value: 'tasks', label: 'Tasks', color: 'border-2 border-neutral-dark bg-transparent' },
+    { value: 'visits', label: 'Workorders', circleColor: 'bg-green-500' },
+    { value: 'tasks', label: 'Tasks', circleColor: 'bg-neutral-700' },
   ]
 
   const filteredTypeOptions = typeOptions.filter(option =>
@@ -156,9 +216,8 @@ export default function ScheduleView() {
     }
   }, [isTeamDropdownOpen])
 
-  // Team filter options
+  // Team filter options (multiselect; no 'all' in list - use Select all / Clear)
   const teamOptions = [
-    { value: 'all', label: 'All' },
     { value: 'unassigned', label: 'Unassigned' },
     ...allTeamMembers.map(member => ({ value: member.name, label: member.name }))
   ]
@@ -166,6 +225,16 @@ export default function ScheduleView() {
   const filteredTeamOptions = teamOptions.filter(option =>
     option.label.toLowerCase().includes(teamSearchTerm.toLowerCase())
   )
+
+  const toggleTeamSelection = (value: string) => {
+    const next = new Set(selectedTeams)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    setSelectedTeams(next)
+  }
+
+  const clearTeamSelection = () => setSelectedTeams(new Set())
+  const selectAllTeams = () => setSelectedTeams(new Set(teamOptions.map(o => o.value)))
 
   // Format time for display (convert 24h to 12h format)
   const formatTime = (time: string) => {
@@ -175,6 +244,84 @@ export default function ScheduleView() {
     const ampm = hour >= 12 ? 'PM' : 'AM'
     const displayHour = hour % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
+  }
+
+  // Format 24h hour + minute to "HH:mm" for schedule
+  const toScheduleTime = (hour: number, minute: number) =>
+    `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+
+  // Parse Y offset in a column (pixelsPerHour) to hour + minute snapped to 15
+  const parseYToTime = (offsetY: number, pixelsPerHour: number, startHour = 0) => {
+    const totalMins = (offsetY / pixelsPerHour) * 60
+    let hour = startHour + Math.floor(totalMins / 60)
+    let minute = Math.floor(totalMins % 60)
+    minute = Math.ceil(minute / 15) * 15
+    if (minute >= 60) {
+      minute = 0
+      hour += 1
+    }
+    return { hour, minute }
+  }
+
+  // Resize: apply mouse move/up to update end or start time (uses only resizeState for initial values)
+  useEffect(() => {
+    if (!resizeState) return
+    const pxPerHour = resizeState.pixelsPerHour
+    const onMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - resizeState.startY
+      const deltaMinutes = Math.round((deltaY / pxPerHour) * 60)
+      const minDuration = 15
+      const s = resizeState
+      if (s.edge === 'bottom') {
+        let newEnd = s.startEndMinutes + deltaMinutes
+        newEnd = Math.max(s.startStartMinutes + minDuration, Math.min(24 * 60, newEnd))
+        newEnd = Math.ceil(newEnd / 15) * 15
+        updateWorkOrder(s.itemId, {
+          schedule: {
+            day: s.scheduleDay,
+            startTime: toScheduleTime(Math.floor(s.startStartMinutes / 60), s.startStartMinutes % 60),
+            endTime: toScheduleTime(Math.floor(newEnd / 60), newEnd % 60),
+          },
+        })
+      } else {
+        let newStart = s.startStartMinutes + deltaMinutes
+        newStart = Math.min(s.startEndMinutes - minDuration, Math.max(0, newStart))
+        newStart = Math.floor(newStart / 15) * 15
+        updateWorkOrder(s.itemId, {
+          schedule: {
+            day: s.scheduleDay,
+            startTime: toScheduleTime(Math.floor(newStart / 60), newStart % 60),
+            endTime: toScheduleTime(Math.floor(s.startEndMinutes / 60), s.startEndMinutes % 60),
+          },
+        })
+      }
+    }
+    const onUp = () => setResizeState(null)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [resizeState])
+
+  // Round up to next 15-minute block and format for modal (e.g. 10:10 → "10:15 AM")
+  const getTimeFromClick = (offsetY: number, pixelsPerHour: number, startHour = 0, endHour = 24) => {
+    const totalMinutesFromStart = (offsetY / pixelsPerHour) * 60
+    let hour = startHour + Math.floor(totalMinutesFromStart / 60)
+    let minute = Math.floor(totalMinutesFromStart % 60)
+    minute = Math.ceil(minute / 15) * 15
+    if (minute >= 60) {
+      minute = 0
+      hour += 1
+    }
+    if (hour >= endHour) {
+      hour = endHour - 1
+      minute = 45
+    }
+    const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`
   }
 
   // Get unscheduled items
@@ -222,9 +369,27 @@ export default function ScheduleView() {
     }
   }
 
+  // Current workorder from live state so inline team edits are reflected
+  const eventDetailWorkorder = selectedItem ? (workOrders.find(w => w.id === selectedItem.id) ?? selectedItem) : null
+  const eventDetailAssignedList = eventDetailWorkorder ? (eventDetailWorkorder.assignedTeamMember || '').split(',').map((s: string) => s.trim()).filter(Boolean) : []
+  const eventDetailAssignToggle = (name: string) => {
+    if (!selectedItem) return
+    const next = eventDetailAssignedList.includes(name) ? eventDetailAssignedList.filter((n: string) => n !== name) : [...eventDetailAssignedList, name]
+    updateWorkOrder(selectedItem.id, { assignedTeamMember: next.join(', ') })
+  }
+  const eventDetailAssignClear = () => {
+    if (!selectedItem) return
+    updateWorkOrder(selectedItem.id, { assignedTeamMember: '' })
+  }
+  const eventDetailAssignSelectAll = () => {
+    if (!selectedItem) return
+    updateWorkOrder(selectedItem.id, { assignedTeamMember: mockTeamMembers.map(m => m.name).join(', ') })
+  }
+  const filteredEventDetailTeam = mockTeamMembers.filter(m => m.name.toLowerCase().includes(eventDetailAssignSearchTerm.toLowerCase()))
+
   const eventDetailModal = selectedItem && typeof document !== 'undefined' && createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true">
-      <div className="absolute inset-0 bg-black/25" onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} />
+      <div className="absolute inset-0 bg-black/25" onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm('') }} />
       <div
         className="relative bg-white rounded-lg shadow-2xl border w-full max-w-[320px] max-h-[85vh] overflow-hidden flex flex-col min-w-[280px]"
         style={{ borderColor: '#EAEBED' }}
@@ -234,10 +399,10 @@ export default function ScheduleView() {
           <div className="flex-1 min-w-0">
             <h2 className="text-sm font-bold mb-0.5 truncate" style={{ color: '#1F271B' }}>{selectedItem!.title}</h2>
             <span className="inline-block px-1 py-0.5 text-xs rounded" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>
-              {(selectedItem as any).type === 'tasks' ? 'Task' : (selectedItem as any).type === 'visits' ? 'Workorder' : 'Event'}
+              {(selectedItem as any).type === 'tasks' ? 'Task' : 'Workorder'}
             </span>
           </div>
-          <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="p-0.5 rounded transition-colors" style={{ color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}>
+          <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm('') }} className="p-0.5 rounded transition-colors" style={{ color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}>
             <FiX size={14} />
           </button>
         </div>
@@ -282,26 +447,106 @@ export default function ScheduleView() {
               </p>
             </div>
           )}
-          <div className="mb-1.5">
+          <div className="mb-1.5 relative">
             <div className="flex items-center gap-1 mb-0.5">
               <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>Team</span>
-              <button className="w-3.5 h-3.5 rounded-full text-white flex items-center justify-center transition-colors flex-shrink-0" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setIsEventDetailAssignOpen(prev => !prev) }}
+                className="w-3.5 h-3.5 rounded-full text-white flex items-center justify-center transition-colors flex-shrink-0"
+                style={{ backgroundColor: '#28AFB0' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
+              >
                 <FiPlus size={10} />
               </button>
             </div>
             <div className="flex flex-wrap gap-0.5">
-              {selectedItem!.assignedTeamMember ? (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                  {selectedItem!.assignedTeamMember}
-                  <button className="hover:opacity-70"><FiX size={8} /></button>
-                </span>
+              {eventDetailAssignedList.length > 0 ? (
+                eventDetailAssignedList.map((name: string) => (
+                  <span key={name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                    {name}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); updateWorkOrder(selectedItem!.id, { assignedTeamMember: eventDetailAssignedList.filter((n: string) => n !== name).join(', ') }) }}
+                      className="hover:opacity-70"
+                      aria-label={`Remove ${name}`}
+                    >
+                      <FiX size={8} />
+                    </button>
+                  </span>
+                ))
               ) : (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
                   All team members
-                  <button className="hover:opacity-70"><FiX size={8} /></button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); eventDetailAssignClear() }}
+                    className="hover:opacity-70"
+                    aria-label="Clear"
+                  >
+                    <FiX size={8} />
+                  </button>
                 </span>
               )}
             </div>
+            {isEventDetailAssignOpen && (
+              <div
+                className="absolute left-0 top-full mt-1 z-[101] bg-white border rounded shadow-xl min-w-[200px] max-w-[280px]"
+                style={{ borderColor: '#EAEBED' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
+                  <input
+                    type="text"
+                    placeholder="Search team"
+                    value={eventDetailAssignSearchTerm}
+                    onChange={(e) => setEventDetailAssignSearchTerm(e.target.value)}
+                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
+                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                  />
+                </div>
+                <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
+                  <span className="text-xs font-medium" style={{ color: '#1F271B' }}>{eventDetailAssignedList.length} selected</span>
+                  <button
+                    type="button"
+                    onClick={() => eventDetailAssignedList.length === mockTeamMembers.length ? eventDetailAssignClear() : eventDetailAssignSelectAll()}
+                    className="text-xs font-medium underline"
+                    style={{ color: '#28AFB0' }}
+                  >
+                    {eventDetailAssignedList.length === mockTeamMembers.length ? 'Clear' : 'Select all'}
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                  {filteredEventDetailTeam.map((member) => {
+                    const isSelected = eventDetailAssignedList.includes(member.name)
+                    return (
+                      <div
+                        key={member.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => eventDetailAssignToggle(member.name)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); eventDetailAssignToggle(member.name) } }}
+                        className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
+                        style={{ backgroundColor: 'transparent' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium flex-shrink-0" style={{ backgroundColor: '#E5E7EB', color: '#1F271B' }}>
+                          {member.name.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{member.name}</span>
+                        {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mb-1.5">
+            <p className="text-xs font-semibold mb-0.5" style={{ color: '#1F271B' }}>Address</p>
+            <p className="text-xs" style={{ color: '#1F271B', opacity: 0.9 }}>{(selectedItem as any).address || '—'}</p>
           </div>
           <div className="grid grid-cols-2 gap-1.5 mb-1.5">
             <div>
@@ -316,11 +561,11 @@ export default function ScheduleView() {
             </div>
           </div>
           <div className="flex gap-1.5 pt-1.5 border-t flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
-            <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="flex-1 px-2 py-1.5 bg-white border rounded transition-colors text-xs font-medium flex items-center justify-center gap-1 whitespace-nowrap" style={{ borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}>
+            <button onClick={() => { const id = selectedItem!.id; setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm(''); router.push(`/workorders/${id}/edit`) }} className="flex-1 px-2 py-1.5 bg-white border rounded transition-colors text-xs font-medium flex items-center justify-center gap-1 whitespace-nowrap" style={{ borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}>
               <FiEdit size={10} />
               Edit
             </button>
-            <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined) }} className="flex-1 px-2 py-1.5 rounded transition-colors text-xs font-medium text-white shadow-sm hover:shadow-md whitespace-nowrap flex items-center justify-center gap-1" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0'; e.currentTarget.style.transform = 'translateY(0)' }}>
+            <button onClick={() => { const id = selectedItem!.id; setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm(''); router.push(`/workorders/${id}`) }} className="flex-1 px-2 py-1.5 rounded transition-colors text-xs font-medium text-white shadow-sm hover:shadow-md whitespace-nowrap flex items-center justify-center gap-1" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0'; e.currentTarget.style.transform = 'translateY(0)' }}>
               View Details
             </button>
           </div>
@@ -601,12 +846,13 @@ export default function ScheduleView() {
                 Day
               </button>
             </div>
-            {/* Unscheduled - separate div, se-green button with tooltip, same height as Day/Week/Month */}
-            <div className="relative flex items-center">
+            {/* Unscheduled - same size/height as Day/Week/Month; tooltip via portal so it stays on screen */}
+            <div className="relative flex items-center ml-1">
               <button
+                ref={unscheduleButtonRef}
                 onClick={() => setShowUnscheduled(!showUnscheduled)}
-                className="py-1 px-2 rounded flex items-center justify-center flex-shrink-0 transition-colors min-h-[22px] min-w-[22px]"
-                style={{ backgroundColor: '#28AFB0' }}
+                className="px-2 py-1 rounded flex items-center justify-center flex-shrink-0 transition-colors text-sm"
+                style={{ backgroundColor: '#28AFB0', minHeight: '28px' }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#1E8A8B'
                   setShowUnscheduledTooltip(true)
@@ -622,17 +868,30 @@ export default function ScheduleView() {
                   <FiX size={8} className="text-white absolute -top-0.5 -right-0.5" strokeWidth={3} />
                 </span>
               </button>
-              {showUnscheduledTooltip && (
+              {showUnscheduledTooltip && unscheduleTooltipStyle && typeof document !== 'undefined' && createPortal(
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 px-2 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap"
-                  style={{ backgroundColor: '#1F271B' }}
+                  className="fixed z-[200] px-2 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap shadow-md pointer-events-none"
+                  style={{
+                    backgroundColor: '#1F271B',
+                    left: unscheduleTooltipStyle.left,
+                    top: unscheduleTooltipStyle.top,
+                    transform: 'translate(-50%, 0)',
+                  }}
                 >
                   Unscheduled
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 -top-1 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px]"
-                    style={{ borderBottomColor: '#1F271B' }}
-                  />
-                </div>
+                  {unscheduleTooltipStyle.above ? (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px]"
+                      style={{ borderTopColor: '#1F271B' }}
+                    />
+                  ) : (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px]"
+                      style={{ borderBottomColor: '#1F271B' }}
+                    />
+                  )}
+                </div>,
+                document.body
               )}
             </div>
             {/* Mobile Unscheduled Toggle - text fallback */}
@@ -690,25 +949,23 @@ export default function ScheduleView() {
                         placeholder="Search types..."
                         value={typeSearchTerm}
                         onChange={(e) => setTypeSearchTerm(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                        className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
                         style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-                    {/* Selected Count */}
+                    {/* Select all when not all selected; Clear only when all selected */}
                     <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-xs" style={{ color: '#1F271B' }}>{selectedTypes.size} selected</span>
-                      {selectedTypes.size > 0 && (
-                        <button
-                          onClick={() => clearTypeSelection()}
-                          className="text-xs underline"
-                          style={{ color: '#28AFB0' }}
-                        >
-                          Clear
-                        </button>
-                      )}
+                      <span className="text-sm font-medium" style={{ color: '#1F271B' }}>{selectedTypes.size} selected</span>
+                      <button
+                        onClick={() => selectedTypes.size === typeOptions.length ? clearTypeSelection() : setSelectedTypes(new Set(typeOptions.map(o => o.value)))}
+                        className="text-sm font-medium underline"
+                        style={{ color: '#28AFB0' }}
+                      >
+                        {selectedTypes.size === typeOptions.length ? 'Clear' : 'Select all'}
+                      </button>
                     </div>
-                    {/* Options */}
+                    {/* Options: full-color circle (unchanged when selected) + selection marker on the right */}
                     <div className="max-h-40 overflow-y-auto">
                       {filteredTypeOptions.map((option) => {
                         const isSelected = selectedTypes.has(option.value)
@@ -716,19 +973,14 @@ export default function ScheduleView() {
                           <div
                             key={option.value}
                             onClick={() => toggleTypeSelection(option.value)}
-                            className="px-2 py-1.5 hover:bg-opacity-50 cursor-pointer flex items-center justify-between transition-colors"
+                            className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
                             style={{ backgroundColor: 'transparent' }}
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                           >
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-3 h-3 rounded-full ${option.color} flex items-center justify-center`}>
-                                {isSelected && (
-                                  <FiCheckCircle className={option.value === 'visits' ? 'text-green-500' : 'text-neutral-dark'} size={10} />
-                                )}
-                              </div>
-                              <span className="text-xs" style={{ color: '#1F271B' }}>{option.label}</span>
-                            </div>
+                            <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 ${option.circleColor}`} />
+                            <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{option.label}</span>
+                            {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
                           </div>
                         )
                       })}
@@ -736,7 +988,7 @@ export default function ScheduleView() {
                   </div>
                 )}
               </div>
-          {/* Team Filter Dropdown */}
+          {/* Team Filter Dropdown - same implementation as Type */}
           <div ref={teamDropdownRef} className="relative flex items-center border rounded overflow-visible" style={{ borderColor: '#EAEBED' }}>
             <span className="px-2 py-1 text-sm font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Team</span>
             <button
@@ -745,90 +997,74 @@ export default function ScheduleView() {
                 setIsTeamDropdownOpen(!isTeamDropdownOpen)
               }}
               className={`px-2 py-1 text-sm font-medium flex items-center gap-1 transition-colors ${
-                teamFilter === 'all' 
-                  ? 'bg-white border-l' 
+                selectedTeams.size === 0 || selectedTeams.size === teamOptions.length
+                  ? 'bg-white border-l'
                   : 'hover:bg-opacity-50'
               }`}
-              style={teamFilter === 'all' 
+              style={selectedTeams.size === 0 || selectedTeams.size === teamOptions.length
                 ? { color: '#1F271B', borderLeftColor: '#EAEBED', backgroundColor: 'white' }
                 : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent' }
               }
               onMouseEnter={(e) => {
-                if (teamFilter !== 'all') {
+                if (selectedTeams.size > 0 && selectedTeams.size !== teamOptions.length) {
                   e.currentTarget.style.backgroundColor = '#F3F4F6'
                 }
               }}
               onMouseLeave={(e) => {
-                if (teamFilter !== 'all') {
+                if (selectedTeams.size > 0 && selectedTeams.size !== teamOptions.length) {
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }
               }}
             >
-              {teamFilter === 'all' ? 'All' : teamFilter === 'unassigned' ? 'Unassigned' : teamFilter}
+              {selectedTeams.size === 0 || selectedTeams.size === teamOptions.length ? 'All' : `${selectedTeams.size} selected`}
               <FiChevronRight size={10} className={`transform transition-transform ${isTeamDropdownOpen ? 'rotate-90' : ''}`} />
             </button>
-                {isTeamDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-xl z-[100] min-w-[180px] max-h-56 overflow-y-auto" style={{ borderColor: '#EAEBED' }}>
-                    {/* Search Bar */}
-                    <div className="p-1.5 border-b sticky top-0 bg-white" style={{ borderColor: '#EAEBED' }}>
-                      <input
-                        type="text"
-                        placeholder="Search team..."
-                        value={teamSearchTerm}
-                        onChange={(e) => setTeamSearchTerm(e.target.value)}
-                        className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    {/* Options */}
-                    <div>
-                      {filteredTeamOptions.map((option) => {
-                        const isSelected = teamFilter === option.value
-                        return (
-                          <div
-                            key={option.value}
-                            onClick={() => {
-                              setTeamFilter(option.value)
-                              setIsTeamDropdownOpen(false)
-                            }}
-                            className={`px-2 py-1.5 cursor-pointer flex items-center justify-between transition-colors ${
-                              isSelected ? 'bg-opacity-50' : ''
-                            }`}
-                            style={{ backgroundColor: isSelected ? '#F3F4F6' : 'transparent' }}
-                            onMouseEnter={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = '#F3F4F6'
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = 'transparent'
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              {option.value !== 'all' && option.value !== 'unassigned' && (
-                                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#2B50AA', opacity: 0.2 }}>
-                                  <span className="text-xs font-semibold" style={{ color: '#2B50AA' }}>
-                                    {getInitials(option.label)}
-                                  </span>
-                                </div>
-                              )}
-                              {option.value === 'unassigned' && (
-                                <FiUsers style={{ color: '#1F271B', opacity: 0.7 }} size={12} />
-                              )}
-                              <span className="text-xs" style={{ color: '#1F271B' }}>{option.label}</span>
-                            </div>
-                            {isSelected && (
-                              <FiCheckCircle className="text-green-500" size={12} />
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
+            {isTeamDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-xl z-[100] min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
+                <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
+                  <input
+                    type="text"
+                    placeholder="Search team..."
+                    value={teamSearchTerm}
+                    onChange={(e) => setTeamSearchTerm(e.target.value)}
+                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
+                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {/* Select all when not all selected; Clear only when all selected */}
+                <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
+                  <span className="text-sm font-medium" style={{ color: '#1F271B' }}>{selectedTeams.size} selected</span>
+                  <button
+                    onClick={() => selectedTeams.size === teamOptions.length ? clearTeamSelection() : selectAllTeams()}
+                    className="text-sm font-medium underline"
+                    style={{ color: '#28AFB0' }}
+                  >
+                    {selectedTeams.size === teamOptions.length ? 'Clear' : 'Select all'}
+                  </button>
+                </div>
+                {/* Options: full-color circle + selection marker on the right; multiselect supported */}
+                <div className="max-h-40 overflow-y-auto">
+                  {filteredTeamOptions.map((option) => {
+                    const isSelected = selectedTeams.has(option.value)
+                    return (
+                      <div
+                        key={option.value}
+                        onClick={() => toggleTeamSelection(option.value)}
+                        className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
+                        style={{ backgroundColor: 'transparent' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <div className="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-[#2B50AA]" />
+                        <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{option.label}</span>
+                        {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -855,8 +1091,8 @@ export default function ScheduleView() {
         >
           {view === 'day' && (
             <div className="h-full flex flex-col" style={{ backgroundColor: '#F3F4F6' }}>
-              {/* Day Header - same pink pill for today as week/month view */}
-              <div className="sticky top-0 bg-white border-b z-20 px-3 py-2 flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
+              {/* Day Header - fixed height so space below does not move when day changes */}
+              <div className="sticky top-0 bg-white border-b z-20 px-3 py-2 flex items-center justify-between min-h-[44px]" style={{ borderColor: '#EAEBED' }}>
                 {isToday(currentDate) ? (
                   <span className="inline-flex items-center rounded px-2 py-1 text-base font-medium text-white" style={{ backgroundColor: '#B084CC' }}>
                     {format(currentDate, 'EEE d')}
@@ -871,23 +1107,22 @@ export default function ScheduleView() {
               {/* Timeline Grid */}
               <div className="flex-1 overflow-y-auto">
                 <div className="flex flex-col">
-                  {/* Horizontal Time Labels Row */}
-                  <div className="flex sticky top-0 bg-white border-b z-15" style={{ borderColor: '#EAEBED' }}>
-                    {/* Empty space for team members column */}
+                  {/* Horizontal Time Labels Row - team spacer + Anytime column (frozen) + 00:00 to 23:00 */}
+                  <div className="flex sticky top-0 bg-white border-b z-15 min-h-[40px] shrink-0" style={{ borderColor: '#EAEBED' }}>
                     <div className="w-48 flex-shrink-0 border-r" style={{ borderColor: '#EAEBED' }}></div>
-                    {/* Anytime column (to the left of 8:00) */}
-                    <div className="w-16 flex-shrink-0 border-r flex items-center justify-center px-1 py-1" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-xs font-medium" style={{ color: '#1F271B' }}>Anytime</span>
+                    {/* Anytime column header (frozen next to team); width matches body below */}
+                    <div className={`flex-shrink-0 border-r flex items-center justify-center ${dayViewAnytimeExpanded ? 'w-64' : 'w-12'}`} style={{ borderColor: '#EAEBED', backgroundColor: '#FAFAF9' }}>
+                      <span className="text-[13px] font-medium" style={{ color: '#1F271B' }}>Anytime</span>
                     </div>
-                    {/* Time labels */}
-                    <div className="flex-1 flex">
+                    {/* Time labels: 00:00 to 23:00 - 24 equal columns to match grid */}
+                    <div className="flex-1 flex flex-nowrap items-stretch min-w-0">
                       {hours.map((hour) => (
-                        <div 
+                        <div
                           key={hour}
-                          className="flex-1 border-r last:border-r-0 px-2 py-1 text-center"
-                          style={{ borderColor: '#EAEBED' }}
+                          className="flex-1 min-w-0 border-r last:border-r-0 px-1.5 py-1 flex items-center justify-center shrink-0"
+                          style={{ borderColor: '#EAEBED', minWidth: '2.75rem' }}
                         >
-                          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                          <span className="text-[13px] font-medium whitespace-nowrap" style={{ color: '#1F271B' }}>
                             {hour.toString().padStart(2, '0')}:00
                           </span>
                         </div>
@@ -896,89 +1131,228 @@ export default function ScheduleView() {
                   </div>
                   
                   <div className="flex">
-                  {/* Team Members Column - Left Side */}
-                  <div className="w-48 flex-shrink-0 border-r bg-white" style={{ borderColor: '#EAEBED' }}>
-                    {/* Anytime Row */}
-                    <div className="px-2 py-2 flex items-center justify-between border-b" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-xs font-medium" style={{ color: '#1F271B' }}>Anytime</span>
-                      <FiChevronRight size={12} className="rotate-90" style={{ color: '#1F271B', opacity: 0.5 }} />
-                    </div>
-                    
-                    {/* Team Members List */}
-                    <div className="divide-y" style={{ borderColor: '#EAEBED' }}>
-                      {/* Unassigned */}
-                      <div className="px-2 py-2 flex items-center justify-between" style={{ minHeight: `${hours.length * 60 / (allTeamMembers.length + 2)}px` }}>
-                        <div className="flex items-center gap-2">
-                          <FiUsers size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
-                          <span className="text-sm" style={{ color: '#1F271B' }}>Unassigned</span>
-                        </div>
-                        <span className="text-xs font-medium" style={{ color: '#1F271B' }}>
-                          {scheduledItems.filter(item => !item.assignedTeamMember && item.schedule?.day && isSameDay(new Date(item.schedule.day), currentDate)).length}
-                        </span>
+                  {/* Team Members Column - Unassigned first, then members */}
+                  {(() => {
+                    const dayViewRowCount = 1 + allTeamMembers.length
+                    const dayViewRowHeightPx = (hours.length * 60) / dayViewRowCount
+                    return (
+                  <div className="w-48 flex-shrink-0 border-r bg-white flex flex-col" style={{ borderColor: '#EAEBED' }}>
+                    {/* Unassigned */}
+                    <div className="px-2 py-2 flex items-center border-b flex-shrink-0" style={{ borderColor: '#EAEBED', minHeight: `${dayViewRowHeightPx}px` }}>
+                      <div className="flex items-center gap-2">
+                        <FiUsers size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
+                        <span className="text-sm" style={{ color: '#1F271B' }}>Unassigned</span>
                       </div>
-                      
-                      {/* Each Team Member */}
-                      {allTeamMembers.map((member) => {
-                        const memberItems = scheduledItems.filter(item => 
-                          item.assignedTeamMember === member.name && 
-                          item.schedule?.day && 
-                          isSameDay(new Date(item.schedule.day), currentDate)
-                        )
-                        return (
-                          <div 
-                            key={member.id} 
-                            className="px-2 py-2 flex items-center justify-between"
-                            style={{ minHeight: `${hours.length * 60 / (allTeamMembers.length + 2)}px` }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F3F4F6' }}>
-                                <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
-                                  {getInitials(member.name)}
-                                </span>
-                              </div>
-                              <span className="text-sm" style={{ color: '#1F271B' }}>{member.name}</span>
-                            </div>
-                            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
-                              {memberItems.length}
-                            </span>
-                          </div>
-                        )
-                      })}
                     </div>
+                    {/* Each Team Member - no count */}
+                    {allTeamMembers.map((member) => {
+                      const memberItems = scheduledItems.filter(item =>
+                        item.assignedTeamMember === member.name &&
+                        item.schedule?.day &&
+                        isSameDay(new Date(item.schedule.day), currentDate)
+                      )
+                      return (
+                        <div
+                          key={member.id}
+                          className="px-2 py-2 flex items-center border-b last:border-b-0 flex-shrink-0"
+                          style={{ borderColor: '#EAEBED', minHeight: `${dayViewRowHeightPx}px` }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F3F4F6' }}>
+                              <span className="text-sm font-medium" style={{ color: '#1F271B' }}>{getInitials(member.name)}</span>
+                            </div>
+                            <span className="text-sm" style={{ color: '#1F271B' }}>{member.name}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
+                    )
+                  })()}
 
-                  {/* Time Column */}
-                  <div className="w-16 flex-shrink-0 border-r" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
-                    {/* Empty space for Anytime row */}
-                    <div className="border-b sticky top-0 bg-white z-10" style={{ minHeight: '40px', borderColor: '#EAEBED' }}></div>
-                    {/* Anytime column body - no time labels */}
-                    {[...Array(allTeamMembers.length + 1)].map((_, rowIndex) => (
-                      <div key={rowIndex} className="border-b" style={{ minHeight: `${hours.length * 60}px`, borderColor: '#EAEBED' }}>
-                        {hours.map((hour, hourIndex) => (
-                          <div
-                            key={hour}
-                            className="border-b relative"
-                            style={{ minHeight: '60px', borderColor: '#EAEBED' }}
-                          >
-                            {/* Current time indicator */}
-                            {isToday(currentDate) && hour === currentHour && hourIndex === 0 && (
-                              <div 
-                                className="absolute left-0 right-0 border-t-2 border-red-500 z-20"
-                                style={{ top: `${(currentMinute / 60) * 60}px` }}
-                              >
-                                <div className="absolute -left-1 -top-1 w-0 h-0 border-l-[5px] border-l-red-500 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent"></div>
+                  {/* Anytime column (frozen): counts per row; click expands to show unscheduled list */}
+                  {(() => {
+                    const dayViewRowCount = 1 + allTeamMembers.length
+                    const dayViewRowHeightPx = (hours.length * 60) / dayViewRowCount
+                    const unassignedAnytimeCount = unscheduledItems.filter(i => !i.assignedTeamMember).length
+                    if (dayViewAnytimeExpanded) {
+                      return (
+                        <div className="w-64 flex-shrink-0 border-r bg-white flex flex-col overflow-hidden" style={{ borderColor: '#EAEBED', backgroundColor: '#FAFAF9' }}>
+                          <div className="flex items-center justify-between px-2 py-2 border-b flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
+                            <span className="text-sm font-semibold" style={{ color: '#1F271B' }}>Anytime</span>
+                            <button type="button" onClick={() => setDayViewAnytimeExpanded(false)} className="p-0.5 rounded hover:bg-gray-200/80" style={{ color: '#1F271B' }} aria-label="Close">
+                              <FiX size={16} />
+                            </button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                            {unscheduledItems.length === 0 ? (
+                              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>No unscheduled items</p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {unscheduledItems.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.stopPropagation()
+                                      e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
+                                      e.dataTransfer.effectAllowed = 'move'
+                                      e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedItem(item)
+                                      setSelectedItemPosition({ x: e.clientX, y: e.clientY })
+                                    }}
+                                    className="flex items-center gap-2 rounded p-2 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all border-l-2 bg-blue-50"
+                                    style={{ borderLeftColor: '#2B50AA' }}
+                                  >
+                                    {item.clientName && (
+                                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium" style={{ backgroundColor: '#E5E7EB', color: '#1F271B' }}>
+                                        {getInitials(item.clientName)}
+                                      </div>
+                                    )}
+                                    <span className="text-xs font-medium truncate flex-1 min-w-0" style={{ color: '#1F271B' }}>
+                                      {[item.clientName, item.title].filter(Boolean).join(' – ')}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
-                        ))}
+                        </div>
+                      )
+                    }
+                    return (
+                      <div
+                        className="w-12 flex-shrink-0 border-r flex flex-col cursor-pointer hover:bg-gray-100/80 transition-colors"
+                        style={{ borderColor: '#EAEBED', backgroundColor: '#FAFAF9' }}
+                        onClick={() => setDayViewAnytimeExpanded(true)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDayViewAnytimeExpanded(true) } }}
+                      >
+                        <div className="flex items-center justify-center border-b flex-shrink-0" style={{ borderColor: '#EAEBED', minHeight: `${dayViewRowHeightPx}px` }}>
+                          <span className="text-sm font-semibold" style={{ color: '#28AFB0' }}>{unassignedAnytimeCount}</span>
+                        </div>
+                        {allTeamMembers.map((member) => {
+                          const count = unscheduledItems.filter(i => i.assignedTeamMember === member.name).length
+                          return (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-center border-b last:border-b-0 flex-shrink-0"
+                              style={{ borderColor: '#EAEBED', minHeight: `${dayViewRowHeightPx}px` }}
+                            >
+                              <span className="text-sm font-semibold" style={{ color: '#28AFB0' }}>{count}</span>
+                            </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    )
+                  })()}
 
-                  {/* Events Column - One row per team member */}
-                  <div className="flex-1 relative" style={{ minHeight: `${hours.length * 60}px`, backgroundColor: '#F3F4F6' }}>
-                    {/* Only 2 event blocks for the day - properly aligned */}
-                    <div className="absolute inset-0 flex flex-col gap-2 pt-2 px-1.5">
+                  {/* Main grid: 24 cols (00:00 to 23:00), rows = Unassigned + team members - aligns with time row above */}
+                  {(() => {
+                    const dayViewRowCount = 1 + allTeamMembers.length
+                    const dayViewRowHeightPx = (hours.length * 60) / dayViewRowCount
+                    const totalGridHeight = dayViewRowCount * dayViewRowHeightPx
+                    const totalCols = hours.length
+                    return (
+                  <div className="flex-1 relative min-w-0" style={{ minHeight: `${totalGridHeight}px` }}>
+                    <div
+                      className="absolute inset-0 grid bg-white"
+                      style={{
+                        gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))`,
+                        gridTemplateRows: `repeat(${dayViewRowCount}, ${dayViewRowHeightPx}px)`,
+                        borderLeft: '1px solid #EAEBED',
+                      }}
+                    >
+                      {[...Array(dayViewRowCount * totalCols)].map((_, i) => {
+                        const rowIndex = Math.floor(i / totalCols)
+                        const colIndex = i % totalCols
+                        return (
+                          <div
+                            key={i}
+                            className={`cursor-pointer hover:bg-gray-50/80 transition-colors ${colIndex === 0 ? 'border-l' : ''} ${rowIndex === 0 ? 'border-t' : ''} border-r border-b`}
+                            style={{ borderColor: '#EAEBED' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              const offsetYInCell = e.clientY - rect.top
+                              const cellHeight = rect.height
+                              let minute = Math.floor((offsetYInCell / cellHeight) * 60)
+                              minute = Math.ceil(minute / 15) * 15
+                              if (minute >= 60) minute = 0
+                              const hour = hours[colIndex]
+                              const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
+                              const ampm = hour >= 12 ? 'PM' : 'AM'
+                              const formattedTime = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`
+                              setModalInitialDate(new Date(currentDate))
+                              setModalInitialTime(formattedTime)
+                              setModalPosition(undefined)
+                              setIsAddWorkorderOpen(true)
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = 'move'
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const json = e.dataTransfer.getData('application/x-schedule-item')
+                              if (!json) return
+                              const { id } = JSON.parse(json) as { id: number }
+                              const item = workOrders.find(w => w.id === id)
+                              if (!item) return
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              const offsetYInCell = e.clientY - rect.top
+                              const cellHeight = rect.height
+                              let minute = Math.floor((offsetYInCell / cellHeight) * 60)
+                              minute = Math.ceil(minute / 15) * 15
+                              if (minute >= 60) minute = 0
+                              const hour = hours[colIndex]
+                              const newStart = toScheduleTime(hour, minute)
+                              const dayStr = format(currentDate, 'yyyy-MM-dd')
+                              const assignee = rowIndex === 0 ? '' : allTeamMembers[rowIndex - 1]?.name ?? item.assignedTeamMember
+                              if (item.schedule?.day && item.schedule?.startTime && item.schedule?.endTime) {
+                                const oldStartM = parseInt(item.schedule.startTime.split(':')[0]) * 60 + parseInt(item.schedule.startTime.split(':')[1])
+                                const oldEndM = parseInt(item.schedule.endTime.split(':')[0]) * 60 + parseInt(item.schedule.endTime.split(':')[1])
+                                const durationM = oldEndM - oldStartM
+                                const newEndM = hour * 60 + minute + durationM
+                                const newEnd = toScheduleTime(Math.floor(newEndM / 60), newEndM % 60)
+                                updateWorkOrder(id, {
+                                  assignedTeamMember: assignee || undefined,
+                                  schedule: { ...item.schedule, day: dayStr, startTime: newStart, endTime: newEnd },
+                                })
+                              } else {
+                                const endM = hour * 60 + minute + 60
+                                const newEnd = toScheduleTime(Math.min(23, Math.floor(endM / 60)), endM % 60)
+                                updateWorkOrder(id, {
+                                  assignedTeamMember: assignee || undefined,
+                                  schedule: { day: dayStr, startTime: newStart, endTime: newEnd },
+                                })
+                              }
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                    {/* Current time line - vertical line at current time */}
+                    {showCurrentTimeDay && (
+                      <div
+                        className="absolute top-0 bottom-0 z-20 flex items-center pointer-events-none"
+                        style={{
+                          left: `${((currentHour * 60 + currentMinute) / (hours.length * 60)) * 100}%`,
+                          width: 0,
+                        }}
+                      >
+                        <div className="w-0.5 h-full bg-red-500" />
+                        <span className="absolute left-1 top-1 text-xs font-medium text-red-600 bg-white/90 px-1.5 py-0.5 rounded whitespace-nowrap">
+                          Now {format(now, 'HH:mm')}
+                        </span>
+                      </div>
+                    )}
+                    {/* Event blocks - one per resource row, positioned by time; lines align with grid */}
+                    <div className="absolute inset-0 pointer-events-none p-0.5" style={{ zIndex: 10 }}>
                       {(() => {
                         const dayItems = scheduledItems
                           .filter(item => item.schedule?.day && item.schedule?.startTime && isSameDay(new Date(item.schedule.day), currentDate))
@@ -987,8 +1361,23 @@ export default function ScheduleView() {
                             const bMin = parseInt(b.schedule!.startTime.split(':')[0]) * 60 + parseInt(b.schedule!.startTime.split(':')[1])
                             return aMin - bMin
                           })
-                          .slice(0, 1)
+                        const totalMinutesInDay = hours.length * 60 // 24 * 60
+                        const gridStartMinutes = 0
+                        const gridEndMinutes = 24 * 60
                         return dayItems.map((item, index) => {
+                          const startMinutes = parseInt(item.schedule!.startTime.split(':')[0]) * 60 + parseInt(item.schedule!.startTime.split(':')[1])
+                          const endMinutes = parseInt(item.schedule!.endTime.split(':')[0]) * 60 + parseInt(item.schedule!.endTime.split(':')[1])
+                          const visibleStart = Math.max(gridStartMinutes, startMinutes)
+                          const visibleEnd = Math.min(gridEndMinutes, endMinutes)
+                          const visibleDuration = Math.max(15, visibleEnd - visibleStart)
+                          const rowIndex = !item.assignedTeamMember ? 0 : (1 + allTeamMembers.findIndex(m => m.name === item.assignedTeamMember))
+                          const safeRowIndex = rowIndex < 0 ? 0 : rowIndex
+                          const topPx = safeRowIndex * dayViewRowHeightPx
+                          const heightPx = dayViewRowHeightPx
+                          const timeFrac = (visibleStart - gridStartMinutes) / totalMinutesInDay
+                          const widthTimeFrac = visibleDuration / totalMinutesInDay
+                          const leftPct = timeFrac * 100
+                          const widthPct = widthTimeFrac * 100
                           let bgColor = 'bg-blue-50'
                           let borderLeftColor = '#2B50AA'
                           const itemType = (item as any).type
@@ -998,31 +1387,85 @@ export default function ScheduleView() {
                           } else if (itemType === 'tasks') {
                             bgColor = 'bg-purple-100'
                             borderLeftColor = '#B084CC'
+                          } else if (itemType === 'events') {
+                            bgColor = 'bg-yellow-50'
+                            borderLeftColor = '#F59E0B'
                           }
                           return (
                             <div
                               key={item.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
+                                e.dataTransfer.effectAllowed = 'move'
+                                e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
+                              }}
+                              className={`absolute rounded overflow-hidden ${bgColor} cursor-grab active:cursor-grabbing hover:shadow-md transition-all pointer-events-auto`}
+                              style={{
+                                borderLeft: `3px solid ${borderLeftColor}`,
+                                top: `${topPx}px`,
+                                left: `${leftPct}%`,
+                                width: `${widthPct}%`,
+                                height: `${heightPx}px`,
+                                zIndex: 10 + index,
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedItem(item)
                                 setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                               }}
-                              className={`flex items-center rounded overflow-hidden ${bgColor} cursor-pointer hover:shadow-md transition-all flex-shrink-0`}
-                              style={{
-                                borderLeft: `3px solid ${borderLeftColor}`,
-                                minHeight: '48px',
-                                padding: '10px 12px'
-                              }}
                             >
-                              <span className="text-sm font-medium truncate block min-w-0" style={{ color: '#1F271B' }} title={`${item.clientName} · ${item.title}`}>
-                                {item.clientName} · {item.title}
-                              </span>
+                              <div className="flex flex-col justify-center gap-0.5 h-full px-2 py-1.5 min-w-0 pointer-events-none">
+                                <span className="text-xs font-semibold truncate min-w-0" style={{ color: '#1F271B' }} title={item.clientName}>{item.clientName || ''}</span>
+                                {item.title && (
+                                  <span className="text-xs truncate min-w-0" style={{ color: '#1F271B', opacity: 0.9 }} title={item.title}>{item.title}</span>
+                                )}
+                                {item.schedule?.startTime && (
+                                  <span className="text-xs truncate min-w-0" style={{ color: '#1F271B', opacity: 0.85 }}>{formatTime(item.schedule.startTime)}</span>
+                                )}
+                              </div>
+                              {/* Resize handle - top edge (change start time) */}
+                              <div
+                                className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10 rounded-t pointer-events-auto"
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setResizeState({
+                                    itemId: item.id,
+                                    edge: 'top',
+                                    startY: e.clientY,
+                                    startEndMinutes: endMinutes,
+                                    startStartMinutes: startMinutes,
+                                    scheduleDay: item.schedule!.day,
+                                    pixelsPerHour: 60,
+                                  })
+                                }}
+                              />
+                              {/* Resize handle - bottom edge (change end time) */}
+                              <div
+                                className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10 rounded-b pointer-events-auto"
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setResizeState({
+                                    itemId: item.id,
+                                    edge: 'bottom',
+                                    startY: e.clientY,
+                                    startEndMinutes: endMinutes,
+                                    startStartMinutes: startMinutes,
+                                    scheduleDay: item.schedule!.day,
+                                    pixelsPerHour: 60,
+                                  })
+                                }}
+                              />
                             </div>
                           )
                         })
                       })()}
                     </div>
                   </div>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
@@ -1031,9 +1474,9 @@ export default function ScheduleView() {
 
       {view === 'week' && (
             <div className="h-full flex flex-col">
-              {/* Week Header */}
-              <div className="grid border-b sticky top-0 bg-white z-20 w-full" style={{ gridTemplateColumns: 'minmax(50px, 60px) repeat(7, minmax(0, 1fr))', borderColor: '#EAEBED' }}>
-                <div className="p-1 border-r flex-shrink-0" style={{ borderColor: '#EAEBED' }}></div>
+              {/* Week Header - same column widths as time grid below for aligned vertical lines */}
+              <div className="grid border-b sticky top-0 bg-white z-20 w-full shrink-0" style={{ gridTemplateColumns: '60px repeat(7, minmax(0, 1fr))', borderColor: '#EAEBED' }}>
+                <div className="p-1.5 border-r flex items-center justify-center" style={{ borderColor: '#EAEBED' }}></div>
             {weekDays.map((day) => (
               <div
                 key={day.toString()}
@@ -1061,19 +1504,19 @@ export default function ScheduleView() {
             ))}
           </div>
 
-              {/* Time Grid */}
-              <div className="flex-1 overflow-y-auto overflow-x-auto bg-gray-100">
-                <div className="grid w-full" style={{ gridTemplateColumns: 'minmax(60px, 80px) repeat(7, minmax(0, 1fr))' }}>
+              {/* Time Grid - same gridTemplateColumns as header so vertical lines align */}
+              <div className="flex-1 overflow-y-auto overflow-x-auto bg-white">
+                <div className="grid w-full min-w-0" style={{ gridTemplateColumns: '60px repeat(7, minmax(0, 1fr))' }}>
                   {/* Time Column */}
-                  <div className="border-r border-neutral-dark/15 flex-shrink-0 bg-gray-100">
-                    <div className="p-1.5 text-sm text-neutral-dark/50 font-medium">↓ Anytime</div>
+                  <div className="border-r flex-shrink-0 bg-[#FAFAFA]" style={{ borderColor: '#EAEBED' }}>
+                    <div className="p-1.5 text-sm font-medium border-b" style={{ color: '#1F271B', opacity: 0.7, borderColor: '#EAEBED' }}>↓ Anytime</div>
             {hours.map((hour) => (
                       <div
                         key={hour}
-                        className="border-b border-neutral-dark/15 relative"
-                        style={{ minHeight: '48px' }}
+                        className="border-b relative"
+                        style={{ minHeight: '48px', borderColor: '#EAEBED' }}
                       >
-                        <div className="absolute top-1 left-1.5 text-sm text-neutral-dark/50 whitespace-nowrap">
+                        <div className="absolute top-1 left-1.5 text-[13px] whitespace-nowrap" style={{ color: '#1F271B', opacity: 0.65 }}>
                           {hour.toString().padStart(2, '0')}:00
                 </div>
                         {/* Current time indicator */}
@@ -1091,11 +1534,76 @@ export default function ScheduleView() {
 
                   {/* Day Columns */}
                   {weekDays.map((day) => (
-                    <div key={day.toString()} className="border-r last:border-r-0 relative overflow-hidden bg-white" style={{ minHeight: `${hours.length * 48}px`, borderColor: '#EAEBED' }}>
-                      {/* Hour grid - visual structure so events align to column */}
+                    <div
+                      key={day.toString()}
+                      className="border-r last:border-r-0 relative overflow-hidden bg-white"
+                      style={{ minHeight: `${hours.length * 48}px`, borderColor: '#EAEBED' }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const json = e.dataTransfer.getData('application/x-schedule-item')
+                        if (!json) return
+                        const { id } = JSON.parse(json) as { id: number }
+                        const item = workOrders.find(w => w.id === id)
+                        if (!item) return
+                        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                        const offsetY = e.clientY - rect.top
+                        const { hour, minute } = parseYToTime(Math.max(0, offsetY), 48)
+                        const newStart = toScheduleTime(hour, minute)
+                        const dayStr = format(day, 'yyyy-MM-dd')
+                        if (item.schedule?.day && item.schedule?.startTime && item.schedule?.endTime) {
+                          const oldStartM = parseInt(item.schedule.startTime.split(':')[0]) * 60 + parseInt(item.schedule.startTime.split(':')[1])
+                          const oldEndM = parseInt(item.schedule.endTime.split(':')[0]) * 60 + parseInt(item.schedule.endTime.split(':')[1])
+                          const durationM = oldEndM - oldStartM
+                          const newEndM = hour * 60 + minute + durationM
+                          const newEnd = toScheduleTime(Math.floor(newEndM / 60), newEndM % 60)
+                          updateWorkOrder(id, {
+                            schedule: { ...item.schedule, day: dayStr, startTime: newStart, endTime: newEnd },
+                          })
+                        } else {
+                          const endM = hour * 60 + minute + 60
+                          const newEnd = toScheduleTime(Math.min(23, Math.floor(endM / 60)), endM % 60)
+                          updateWorkOrder(id, {
+                            schedule: { day: dayStr, startTime: newStart, endTime: newEnd },
+                          })
+                        }
+                      }}
+                    >
+                      {/* Clickable time grid: click to open add modal with time snapped to 15 min */}
+                      <div
+                        className="absolute inset-0 z-0 cursor-pointer"
+                        style={{ height: `${hours.length * 48}px` }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const offsetY = e.clientY - rect.top
+                          const formattedTime = getTimeFromClick(Math.max(0, offsetY), 48)
+                          setModalInitialDate(new Date(day))
+                          setModalInitialTime(formattedTime)
+                          setModalPosition(undefined)
+                          setIsAddWorkorderOpen(true)
+                        }}
+                      />
+                      {/* Current time line - week view (when viewing today) */}
+                      {showCurrentTimeWeek(day) && (
+                        <div
+                          className="absolute left-0 right-0 z-20 flex items-center gap-0.5 pointer-events-none"
+                          style={{ top: `${currentTimeTopWeek}px` }}
+                        >
+                          <div className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[6px] border-l-red-500 shrink-0" />
+                          <div className="h-0.5 flex-1 bg-red-500" />
+                          <span className="text-[10px] font-medium text-red-600 bg-white/90 px-1 py-0.5 rounded shrink-0">
+                            Now
+                          </span>
+                        </div>
+                      )}
+                      {/* Internal horizontal lines - one per hour; same color as day view for alignment */}
                       <div className="absolute inset-0 pointer-events-none flex flex-col">
                         {hours.map((hour) => (
-                          <div key={hour} style={{ minHeight: '48px' }} />
+                          <div key={hour} className="border-b" style={{ minHeight: '48px', borderColor: '#EAEBED' }} />
                         ))}
                       </div>
                       {/* Render all events for this day positioned absolutely */}
@@ -1113,16 +1621,17 @@ export default function ScheduleView() {
                           return aTime - bTime
                         })
 
+                        const gridStartMinutes = 0
+                        const gridEndMinutes = 24 * 60
                         return sortedItems.map((item, index) => {
                           const startMinutes = parseInt(item.schedule.startTime.split(':')[0]) * 60 + parseInt(item.schedule.startTime.split(':')[1])
                           const endMinutes = parseInt(item.schedule.endTime.split(':')[0]) * 60 + parseInt(item.schedule.endTime.split(':')[1])
-                          const durationHours = (endMinutes - startMinutes) / 60
-                          const startHour = parseInt(item.schedule.startTime.split(':')[0])
-                          const startMinute = parseInt(item.schedule.startTime.split(':')[1])
-                          
-                          // Calculate position from top of the timeline (8 AM = 0)
-                          const topPosition = ((startHour - 8) * 48) + (startMinute / 60 * 48)
-                          const height = Math.max(durationHours * 48, 48)
+                          const visibleStart = Math.max(gridStartMinutes, startMinutes)
+                          const visibleEnd = Math.min(gridEndMinutes, endMinutes)
+                          const visibleDurationMinutes = Math.max(15, visibleEnd - visibleStart)
+                          // Position from top of timeline (0:00 = 0), clamp to grid
+                          const topPosition = ((visibleStart - gridStartMinutes) / 60) * 48
+                          const height = (visibleDurationMinutes / 60) * 48
 
                           // Determine event color based on type or use default
                           let bgColor = 'bg-blue-50'
@@ -1143,15 +1652,21 @@ export default function ScheduleView() {
                           return (
                             <div
                               key={item.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
+                                e.dataTransfer.effectAllowed = 'move'
+                                e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedItem(item)
                                 setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                               }}
-                              className={`absolute rounded overflow-hidden ${bgColor} cursor-pointer hover:shadow-md transition-all`}
+                              className={`absolute rounded overflow-hidden ${bgColor} cursor-grab active:cursor-grabbing hover:shadow-md transition-all`}
                               style={{
-                                left: '6px',
-                                right: '6px',
+                                left: '4px',
+                                right: '4px',
                                 top: `${topPosition}px`,
                                 height: `${height}px`,
                                 minHeight: '32px',
@@ -1160,33 +1675,53 @@ export default function ScheduleView() {
                                 zIndex: 10 + index
                               }}
                             >
-                              <div className="flex flex-row items-center h-full w-full min-w-0 overflow-hidden">
-                                <span className="text-sm font-medium truncate block min-w-0" style={{ color: '#1F271B' }} title={`${item.clientName} · ${item.title}`}>
-                                  {item.clientName} · {item.title}
-                                </span>
+                              <div className="flex flex-col justify-center gap-0.5 h-full w-full min-w-0 overflow-hidden pointer-events-none">
+                                <span className="text-xs font-semibold truncate min-w-0" style={{ color: '#1F271B' }} title={item.clientName}>{item.clientName || ''}</span>
+                                {item.title && (
+                                  <span className="text-xs truncate min-w-0" style={{ color: '#1F271B', opacity: 0.9 }} title={item.title}>{item.title}</span>
+                                )}
+                                {item.schedule?.startTime && (
+                                  <span className="text-xs truncate min-w-0" style={{ color: '#1F271B', opacity: 0.85 }}>{formatTime(item.schedule.startTime)}</span>
+                                )}
                               </div>
+                              {/* Resize - top edge */}
+                              <div
+                                className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10 rounded-t pointer-events-auto"
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setResizeState({
+                                    itemId: item.id,
+                                    edge: 'top',
+                                    startY: e.clientY,
+                                    startEndMinutes: endMinutes,
+                                    startStartMinutes: startMinutes,
+                                    scheduleDay: item.schedule.day,
+                                    pixelsPerHour: 48,
+                                  })
+                                }}
+                              />
+                              {/* Resize - bottom edge */}
+                              <div
+                                className="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10 rounded-b pointer-events-auto"
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setResizeState({
+                                    itemId: item.id,
+                                    edge: 'bottom',
+                                    startY: e.clientY,
+                                    startEndMinutes: endMinutes,
+                                    startStartMinutes: startMinutes,
+                                    scheduleDay: item.schedule.day,
+                                    pixelsPerHour: 48,
+                                  })
+                                }}
+                              />
                             </div>
                           )
                         })
                       })()}
-                      
-                      {/* Hour slots - clickable for adding events */}
-                      {hours.map((hour) => (
-                        <div
-                          key={hour}
-                          className="absolute left-0 right-0 border-b cursor-pointer z-0"
-                          style={{ top: `${(hour - 8) * 48}px`, height: '48px', borderColor: '#EAEBED' }}
-                          onClick={() => {
-                            const clickedDate = new Date(day)
-                            const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour
-                            const ampm = hour >= 12 ? 'PM' : 'AM'
-                            const formattedTime = `${hour12}:00 ${ampm}`
-                            setModalInitialDate(clickedDate)
-                            setModalInitialTime(formattedTime)
-                            setIsAddWorkorderOpen(true)
-                          }}
-                        />
-                      ))}
               </div>
             ))}
                 </div>
@@ -1196,27 +1731,28 @@ export default function ScheduleView() {
 
           {view === 'month' && (
             <div className="h-full flex flex-col p-3" style={{ backgroundColor: '#F3F4F6' }}>
-              {/* Month Calendar Grid */}
+              {/* Month Calendar Grid - header and cells use same 7-col grid for aligned lines */}
         <div className="bg-white rounded shadow-sm border overflow-hidden" style={{ borderColor: '#EAEBED' }}>
-                {/* Day Headers - Mon to Sun */}
-                <div className="grid grid-cols-7 border-b bg-white" style={{ borderColor: '#EAEBED' }}>
+                {/* Day Headers - Mon to Sun; highlight today's column only when viewing current month */}
+                <div className="grid grid-cols-7 border-b bg-white shrink-0" style={{ borderColor: '#EAEBED' }}>
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
                     const today = new Date()
                     const currentDayOfWeek = getDay(today) // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
                     const isCurrentDay = (currentDayOfWeek + 6) % 7 === index
-                    
-              return (
+                    const isViewingCurrentMonth = isSameMonth(currentDate, today)
+                    const highlightDay = isCurrentDay && isViewingCurrentMonth
+                    return (
                       <div
                         key={day}
                         className={`p-2 text-center border-r last:border-r-0 ${
-                          isCurrentDay ? 'rounded-t' : ''
+                          highlightDay ? 'rounded-t' : ''
                         }`}
-                        style={{ borderColor: '#EAEBED', backgroundColor: isCurrentDay ? '#B084CC' : 'white' }}
+                        style={{ borderColor: '#EAEBED', backgroundColor: highlightDay ? '#B084CC' : 'white' }}
                       >
                         <span className={`text-xs font-medium ${
-                          isCurrentDay ? 'text-white' : ''
+                          highlightDay ? 'text-white' : ''
                         }`}
-                        style={!isCurrentDay ? { color: '#1F271B' } : {}}
+                        style={!highlightDay ? { color: '#1F271B' } : {}}
                         >
                           {day}
                         </span>
@@ -1225,8 +1761,8 @@ export default function ScheduleView() {
                   })}
                 </div>
 
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7">
+                {/* Calendar Grid - same 7 columns so vertical lines align with header */}
+                <div className="grid grid-cols-7" style={{ borderColor: '#EAEBED' }}>
                   {(() => {
                     const monthStart = startOfMonth(currentDate)
                     const monthEnd = endOfMonth(currentDate)
@@ -1250,17 +1786,37 @@ export default function ScheduleView() {
                         <div
                           key={day.toString()}
                           className={`min-h-[80px] border-r border-b last:border-r-0 p-1.5 cursor-pointer ${
-                            isCurrentMonth ? 'bg-white' : ''
+                            isCurrentMonth ? 'bg-white' : 'bg-[#F9FAFB]'
                           }`}
-                          style={{ 
-                            borderColor: '#EAEBED',
-                            backgroundColor: isCurrentMonth ? 'white' : '#F9FAFB'
-                          }}
+                          style={{ borderColor: '#EAEBED' }}
                           onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('[data-draggable-event]')) return
                             setModalInitialDate(day)
                             setModalInitialTime(undefined)
                             setModalPosition({ x: e.clientX, y: e.clientY })
                             setIsAddWorkorderOpen(true)
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            const json = e.dataTransfer.getData('application/x-schedule-item')
+                            if (!json) return
+                            const { id } = JSON.parse(json) as { id: number }
+                            const item = workOrders.find(w => w.id === id)
+                            if (!item) return
+                            const dayStr = format(day, 'yyyy-MM-dd')
+                            if (item.schedule?.day && item.schedule?.startTime && item.schedule?.endTime) {
+                              updateWorkOrder(id, {
+                                schedule: { ...item.schedule, day: dayStr },
+                              })
+                            } else {
+                              updateWorkOrder(id, {
+                                schedule: { day: dayStr, startTime: '09:00', endTime: '10:00' },
+                              })
+                            }
                           }}
                         >
                           {/* Date Number */}
@@ -1303,21 +1859,27 @@ export default function ScheduleView() {
                               return (
                                 <div
                                   key={item.id}
+                                  data-draggable-event
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.stopPropagation()
+                                    e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
+                                    e.dataTransfer.effectAllowed = 'move'
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setSelectedItem(item)
                                     setSelectedItemPosition({ x: e.clientX, y: e.clientY })
                                   }}
-                                  className={`text-xs px-1 py-0.5 rounded ${bgColor} cursor-pointer hover:opacity-80 truncate`}
-                                  style={{ borderLeft: `2px solid ${borderColor}` }}
+                                  className={`text-xs px-2 py-1 rounded overflow-hidden border-l-2 ${bgColor} cursor-grab active:cursor-grabbing hover:shadow-md min-w-0`}
+                                  style={{ borderLeftColor: borderColor }}
                                 >
-                                  {item.schedule?.startTime && (
-                                    <span className="font-medium">{formatTime(item.schedule.startTime)}</span>
-                                  )}{' '}
-                                  <span className="truncate">{item.clientName}</span>
-                </div>
-              )
-            })}
+                                  <span className="block truncate font-medium" style={{ color: '#1F271B' }} title={item.clientName}>{item.clientName}</span>
+                                  {item.title && <span className="block truncate max-w-full" style={{ color: '#1F271B', opacity: 0.9 }} title={item.title}>{item.title}</span>}
+                                  {item.schedule?.startTime && <span className="block font-medium mt-0.5" style={{ color: '#1F271B', opacity: 0.85 }}>{formatTime(item.schedule.startTime)}</span>}
+                                </div>
+                              )
+                            })}
                             {dayEvents.length > 3 && (
                               <div className="text-xs px-1" style={{ color: '#1F271B', opacity: 0.6 }}>
                                 +{dayEvents.length - 3} more
@@ -1362,7 +1924,13 @@ export default function ScheduleView() {
                   {unscheduledItems.map((item) => (
                     <div
                       key={item.id}
-                      className="p-3 bg-neutral-light rounded-lg border border-neutral-light cursor-move hover:shadow-sm transition-shadow"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
+                      }}
+                      className="p-3 bg-neutral-light rounded-lg border border-neutral-light cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow"
                     >
                       <p className="text-sm font-medium text-neutral-dark">{item.clientName}</p>
                       <p className="text-xs text-neutral-dark/70 mt-1">{item.title}</p>

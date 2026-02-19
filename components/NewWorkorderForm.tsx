@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiSave, FiChevronLeft, FiPlus, FiX, FiChevronDown, FiTrash2, FiCheckCircle, FiUpload } from 'react-icons/fi'
+import { FiSave, FiChevronLeft, FiPlus, FiX, FiChevronDown, FiTrash2, FiCheckCircle, FiUpload, FiCheck } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { mockClients, mockTeamMembers, mockWorkorders, mockMaterialsList, companyTaxRatePercent } from '@/data/mockData'
 import AddProductServiceModal, { type NewProductServiceData } from './AddProductServiceModal'
@@ -32,6 +32,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
   const [clientSearchTerm, setClientSearchTerm] = useState('')
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
   const [isTeamMemberDropdownOpen, setIsTeamMemberDropdownOpen] = useState(false)
+  const [assignSearchTerm, setAssignSearchTerm] = useState('')
   const [lineItemNameDropdownIndex, setLineItemNameDropdownIndex] = useState<number | null>(null)
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
   const [addProductModalLineIndex, setAddProductModalLineIndex] = useState<number | null>(null)
@@ -53,8 +54,8 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
     startTime: workorder?.schedule?.startTime || '09:00',
     endTime: workorder?.schedule?.endTime || '10:00',
     scheduleLater: false,
-    anytime: false,
-    assignedTeamMember: workorder?.assignedTeamMember || '',
+    anytime: workorder ? (workorder as { anytime?: boolean }).anytime ?? false : true,
+    assignedTeamMembers: workorder?.assignedTeamMember ? [workorder.assignedTeamMember] : [] as string[],
     instructions: workorder?.instructions || '',
     lineItems: (workorder?.lineItems || []).map((item: any) => ({
       name: item.name,
@@ -179,13 +180,23 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
     setClientSearchTerm('')
   }
 
-  const handleTeamMemberSelect = (memberName: string) => {
-    setFormData({
-      ...formData,
-      assignedTeamMember: memberName,
-    })
-    setIsTeamMemberDropdownOpen(false)
+  // Assign options: Business owner + team members (no Unavailable - same as Filter)
+  const assignOptions = [
+    { value: 'Business owner', label: 'Business owner' },
+    ...mockTeamMembers.map(m => ({ value: m.name, label: m.name })),
+  ]
+  const filteredAssignOptions = assignOptions.filter(opt =>
+    opt.label.toLowerCase().includes(assignSearchTerm.toLowerCase())
+  )
+  const assignedSet = new Set(formData.assignedTeamMembers)
+  const toggleAssignSelection = (value: string) => {
+    const next = assignedSet.has(value)
+      ? formData.assignedTeamMembers.filter(n => n !== value)
+      : [...formData.assignedTeamMembers, value]
+    setFormData({ ...formData, assignedTeamMembers: next })
   }
+  const clearAssignSelection = () => setFormData({ ...formData, assignedTeamMembers: [] })
+  const selectAllAssign = () => setFormData({ ...formData, assignedTeamMembers: assignOptions.map(o => o.value) })
 
   const addLineItem = () => {
     setFormData({
@@ -316,7 +327,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
                         e.currentTarget.style.boxShadow = 'none'
                       }}
                     />
-                    {isClientDropdownOpen && filteredClients.length > 0 && (
+                    {isClientDropdownOpen && (
                       <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto" style={{ borderColor: '#EAEBED' }}>
                         {filteredClients.map((client) => (
                           <button
@@ -344,6 +355,17 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
                             <div className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>{client.phone}</div>
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium transition-colors"
+                          style={{ color: '#28AFB0' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
+                          onClick={() => setIsClientDropdownOpen(false)}
+                        >
+                          <FiPlus size={14} />
+                          <span>New client</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -384,7 +406,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
             </div>
 
             {/* Date and time selection row first */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className={`grid gap-3 mb-4 ${formData.anytime ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>
                   Start date
@@ -407,50 +429,54 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
                   }}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>
-                  Start time
-                </label>
-                <input
-                  type="time"
-                  name="startTime"
-                  value={formData.startTime}
-                  onChange={handleChange}
-                  disabled={formData.scheduleLater || formData.anytime}
-                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all disabled:opacity-60 disabled:bg-gray-50"
-                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#28AFB0'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#EAEBED'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>
-                  End time
-                </label>
-                <input
-                  type="time"
-                  name="endTime"
-                  value={formData.endTime}
-                  onChange={handleChange}
-                  disabled={formData.scheduleLater || formData.anytime}
-                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all disabled:opacity-60 disabled:bg-gray-50"
-                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#28AFB0'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#EAEBED'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                />
-              </div>
+              {!formData.anytime && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>
+                      Start time
+                    </label>
+                    <input
+                      type="time"
+                      name="startTime"
+                      value={formData.startTime}
+                      onChange={handleChange}
+                      disabled={formData.scheduleLater}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all disabled:opacity-60 disabled:bg-gray-50"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#28AFB0'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#EAEBED'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.7 }}>
+                      End time
+                    </label>
+                    <input
+                      type="time"
+                      name="endTime"
+                      value={formData.endTime}
+                      onChange={handleChange}
+                      disabled={formData.scheduleLater}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all disabled:opacity-60 disabled:bg-gray-50"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#28AFB0'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#EAEBED'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Schedule later and Anytime below date/time selection */}
@@ -484,7 +510,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
             </div>
             </div>
 
-            {/* Assign Team Member - right of Schedule */}
+            {/* Assign Team Member - Filter-style popup: Search team, Select all/Clear, list (incl. Business owner); no Unavailable */}
             <div className="lg:col-span-1 bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
               <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                 Assign Team Member
@@ -494,7 +520,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
                   type="button"
                   onClick={() => setIsTeamMemberDropdownOpen(!isTeamMemberDropdownOpen)}
                   className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all flex items-center justify-between"
-                  style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
+                  style={{ borderColor: '#EAEBED', color: formData.assignedTeamMembers.length ? '#1F271B' : '#9CA3AF', backgroundColor: 'white' }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = '#28AFB0'
                     e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
@@ -504,58 +530,61 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
                     e.currentTarget.style.boxShadow = 'none'
                   }}
                 >
-                  <span>{formData.assignedTeamMember || 'Select team member'}</span>
-                  <FiChevronDown size={14} style={{ color: '#1F271B', opacity: 0.5 }} />
+                  <span className="truncate">
+                    {formData.assignedTeamMembers.length === 0
+                      ? 'Select team member'
+                      : formData.assignedTeamMembers.length === 1
+                        ? formData.assignedTeamMembers[0]
+                        : `${formData.assignedTeamMembers.length} selected`}
+                  </span>
+                  <FiChevronDown size={14} style={{ color: '#1F271B', opacity: 0.5 }} className={`transition-transform ${isTeamMemberDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {isTeamMemberDropdownOpen && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto" style={{ borderColor: '#EAEBED' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleTeamMemberSelect('')}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-opacity-50 transition-colors border-b"
-                      style={{ 
-                        color: '#1F271B', 
-                        backgroundColor: formData.assignedTeamMember === '' ? '#F3F4F6' : 'white',
-                        borderBottomColor: '#EAEBED'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (formData.assignedTeamMember !== '') {
-                          e.currentTarget.style.backgroundColor = '#F9FAFB'
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (formData.assignedTeamMember !== '') {
-                          e.currentTarget.style.backgroundColor = 'white'
-                        }
-                      }}
-                    >
-                      None
-                    </button>
-                    {mockTeamMembers.map((member) => (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-xl min-w-[200px]" style={{ borderColor: '#EAEBED' }}>
+                    <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
+                      <input
+                        type="text"
+                        placeholder="Search team"
+                        value={assignSearchTerm}
+                        onChange={(e) => setAssignSearchTerm(e.target.value)}
+                        className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
+                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
+                      <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Select team</span>
                       <button
-                        key={member.name}
                         type="button"
-                        onClick={() => handleTeamMemberSelect(member.name)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-opacity-50 transition-colors border-b"
-                        style={{ 
-                          color: '#1F271B', 
-                          backgroundColor: formData.assignedTeamMember === member.name ? '#F3F4F6' : 'white',
-                          borderBottomColor: '#EAEBED'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (formData.assignedTeamMember !== member.name) {
-                            e.currentTarget.style.backgroundColor = '#F9FAFB'
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (formData.assignedTeamMember !== member.name) {
-                            e.currentTarget.style.backgroundColor = 'white'
-                          }
-                        }}
+                        onClick={() => assignedSet.size === assignOptions.length ? clearAssignSelection() : selectAllAssign()}
+                        className="text-sm font-medium underline"
+                        style={{ color: '#28AFB0' }}
                       >
-                        {member.name}
+                        {assignedSet.size === assignOptions.length ? 'Clear' : 'Select all'}
                       </button>
-                    ))}
+                    </div>
+                    <div className="max-h-40 overflow-y-auto">
+                      {filteredAssignOptions.map((option) => {
+                        const isSelected = assignedSet.has(option.value)
+                        return (
+                          <div
+                            key={option.value}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleAssignSelection(option.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAssignSelection(option.value) } }}
+                            className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
+                            style={{ backgroundColor: 'transparent' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                          >
+                            <div className="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-[#2B50AA]" />
+                            <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{option.label}</span>
+                            {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -565,6 +594,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
           {/* Instructions Section */}
           <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
             <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Instructions</h2>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Instructions</label>
             <textarea
               name="instructions"
               value={formData.instructions}

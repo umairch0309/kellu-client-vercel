@@ -344,6 +344,7 @@ function CompanySettings() {
 
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Email for notifications</h2>
+        <label className={labelClass} style={{ color: '#1F271B' }}>Email</label>
         <input type="email" placeholder="notifications@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
       </section>
 
@@ -391,6 +392,7 @@ function CompanySettings() {
 
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>WhatsApp sender</h2>
+        <label className={labelClass} style={{ color: '#1F271B' }}>Sender name or number</label>
         <input type="text" placeholder="Sender name or number" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
       </section>
 
