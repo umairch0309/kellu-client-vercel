@@ -536,13 +536,14 @@ export default function WorkordersList() {
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Job status</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Invoice status</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Total</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Created at</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold" style={{ color: '#1F271B' }}>Last modified</th>
               </tr>
             </thead>
             <tbody>
               {filteredWorkorders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
+                  <td colSpan={10} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
                     No workorders found
                   </td>
                 </tr>
@@ -593,6 +594,13 @@ export default function WorkordersList() {
                       </td>
                       <td className="px-3 py-2">
                         <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Rs {workorder.total.toFixed(2)}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
+                          {(workorder as { createdAt?: string }).createdAt
+                            ? format(new Date((workorder as { createdAt: string }).createdAt), 'MMM d, yyyy')
+                            : '—'}
+                        </p>
                       </td>
                       <td className="px-3 py-2">
                         <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>

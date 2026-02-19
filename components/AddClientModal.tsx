@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FiSave, FiUser, FiPhone, FiMail, FiMapPin, FiFileText, FiMessageSquare } from 'react-icons/fi'
+import { FiSave, FiUser, FiPhone, FiMail, FiFileText, FiMessageSquare } from 'react-icons/fi'
 import Modal from './Modal'
 
 interface Client {
@@ -44,7 +44,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
     phone: '',
     email: '',
     documentNumber: '',
-    address: '',
     leadSource: '',
     notes: '',
   })
@@ -56,7 +55,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         phone: client.phone || '',
         email: client.email || '',
         documentNumber: client.documentNumber || '',
-        address: client.address || '',
         leadSource: client.leadSource || '',
         notes: client.notes || '',
       })
@@ -66,7 +64,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         phone: '',
         email: '',
         documentNumber: '',
-        address: '',
         leadSource: '',
         notes: '',
       })
@@ -81,7 +78,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         phone: formData.phone,
         email: formData.email || undefined,
         documentNumber: formData.documentNumber || undefined,
-        address: formData.address || undefined,
         leadSource: formData.leadSource || undefined,
         notes: formData.notes || undefined,
       })
@@ -94,7 +90,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         phone: '',
         email: '',
         documentNumber: '',
-        address: '',
         leadSource: '',
         notes: '',
       })
@@ -174,28 +169,6 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
                   </p>
                 )}
               </div>
-            </div>
-          </section>
-
-          {/* Address */}
-          <section className="space-y-4">
-            <h3 className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#1F271B' }}>
-              <span className="flex items-center justify-center w-7 h-7 rounded-lg" style={{ backgroundColor: 'rgba(40, 175, 176, 0.12)' }}>
-                <FiMapPin size={14} style={{ color: '#28AFB0' }} />
-              </span>
-              Address
-            </h3>
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B', opacity: 0.85 }}>Address</label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="Street, city, state, ZIP"
-                className={`${inputBase} ${focusRing}`}
-                style={inputStyle}
-              />
             </div>
           </section>
 

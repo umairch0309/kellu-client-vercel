@@ -54,10 +54,19 @@ export default function AddProductServiceModal({
       name === 'markupPercent' ||
       name === 'unitPrice'
     ) {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: parseFloat(String(value)) || 0,
-      }))
+      const num = parseFloat(String(value)) || 0
+      setFormData((prev) => {
+        const next = { ...prev, [name]: num }
+        const cost = name === 'unitCost' ? num : prev.unitCost
+        const markup = name === 'markupPercent' ? num : prev.markupPercent
+        const price = name === 'unitPrice' ? num : prev.unitPrice
+        if (name === 'unitCost' || name === 'markupPercent') {
+          next.unitPrice = cost * (1 + markup / 100)
+        } else {
+          if (cost > 0) next.markupPercent = (price / cost - 1) * 100
+        }
+        return next
+      })
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }))
     }
@@ -147,63 +156,68 @@ export default function AddProductServiceModal({
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label
-              className="block text-xs font-medium mb-1.5"
-              style={{ color: '#1F271B', opacity: 0.85 }}
-            >
-              Unit cost
-            </label>
-            <input
-              type="number"
-              name="unitCost"
-              value={formData.unitCost || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              placeholder="0"
-              className={`${inputBase} ${focusRing}`}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label
-              className="block text-xs font-medium mb-1.5"
-              style={{ color: '#1F271B', opacity: 0.85 }}
-            >
-              Markup (%)
-            </label>
-            <input
-              type="number"
-              name="markupPercent"
-              value={formData.markupPercent || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              placeholder="0"
-              className={`${inputBase} ${focusRing}`}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label
-              className="block text-xs font-medium mb-1.5"
-              style={{ color: '#1F271B', opacity: 0.85 }}
-            >
-              Unit price
-            </label>
-            <input
-              type="number"
-              name="unitPrice"
-              value={formData.unitPrice || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              placeholder="0"
-              className={`${inputBase} ${focusRing}`}
-              style={inputStyle}
-            />
+        <div>
+          <p className="text-xs mb-2" style={{ color: '#1F271B', opacity: 0.7 }}>
+            Unit price = Unit cost × (1 + Markup % ÷ 100). Changing cost or markup updates price; changing price updates markup.
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: '#1F271B', opacity: 0.85 }}
+              >
+                Unit cost
+              </label>
+              <input
+                type="number"
+                name="unitCost"
+                value={formData.unitCost || ''}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                placeholder="0"
+                className={`${inputBase} ${focusRing}`}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: '#1F271B', opacity: 0.85 }}
+              >
+                Markup (%)
+              </label>
+              <input
+                type="number"
+                name="markupPercent"
+                value={formData.markupPercent || ''}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                placeholder="0"
+                className={`${inputBase} ${focusRing}`}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-xs font-medium mb-1.5"
+                style={{ color: '#1F271B', opacity: 0.85 }}
+              >
+                Unit price
+              </label>
+              <input
+                type="number"
+                name="unitPrice"
+                value={formData.unitPrice || ''}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                placeholder="0"
+                className={`${inputBase} ${focusRing}`}
+                style={inputStyle}
+              />
+            </div>
           </div>
         </div>
 

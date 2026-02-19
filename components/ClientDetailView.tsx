@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiEdit, FiMoreVertical, FiPlus, FiChevronLeft, FiMail, FiUser, FiFileText, FiUpload } from 'react-icons/fi'
+import { format } from 'date-fns'
+import { FiEdit, FiMoreVertical, FiPlus, FiChevronLeft, FiMail, FiUser, FiFileText, FiUpload, FiTrash2 } from 'react-icons/fi'
 import { mockClients, mockWorkorders } from '@/data/mockData'
+import { useClientReminders } from '@/context/ClientRemindersContext'
 import AddWorkorderModal from './AddWorkorderModal'
+import SendMessageModal from './SendMessageModal'
+import SetCustomerReminderModal from './SetCustomerReminderModal'
 
 interface ClientDetailViewProps {
   clientId: number
@@ -14,10 +18,16 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
   const router = useRouter()
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
   const [isAddWorkorderOpen, setIsAddWorkorderOpen] = useState(false)
+  const [isSendMessageOpen, setIsSendMessageOpen] = useState(false)
   const [selectedOverviewTab, setSelectedOverviewTab] = useState('Active Work')
   const [internalNote, setInternalNote] = useState('')
+  const [isSetReminderOpen, setIsSetReminderOpen] = useState(false)
+  const [editingReminder, setEditingReminder] = useState(false)
 
+  const { getReminder, setReminder, deleteReminder, isReminderDue } = useClientReminders()
   const client = mockClients.find(c => c.id === clientId)
+  const reminder = client ? getReminder(client.id) : null
+  const reminderDue = reminder ? isReminderDue(reminder) : false
   const clientWorkorders = mockWorkorders.filter(wo => wo.clientId === clientId)
 
   useEffect(() => {
@@ -62,6 +72,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setIsSendMessageOpen(true)}
             className="px-3 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all"
             style={{ 
               backgroundColor: 'white',
@@ -78,7 +89,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
             }}
           >
             <FiMail size={14} />
-            <span>Send Email</span>
+            <span>Send Message</span>
           </button>
           <button
             onClick={() => router.push(`/clients/${clientId}/edit`)}
@@ -150,6 +161,30 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                 <button
                   onClick={() => {
                     setIsMoreActionsOpen(false)
+                    alert('Create Quote (Static UI – not implemented)')
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-t"
+                  style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  Create Quote
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMoreActionsOpen(false)
+                    alert('Create Invoice (Static UI – not implemented)')
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-t"
+                  style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  Create Invoice
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMoreActionsOpen(false)
                     alert('Archive client (Static UI – not implemented)')
                   }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-t"
@@ -157,7 +192,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
-                  Archived Client
+                  Archived
                 </button>
               </div>
             )}
@@ -172,7 +207,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
           {/* Overview Section */}
           <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
             <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-base font-bold" style={{ color: '#1F271B' }}>Overview</h2>
+              <h2 className="text-lg font-bold" style={{ color: '#1F271B' }}>Overview</h2>
               <button
                 className="px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
                 style={{ backgroundColor: '#28AFB0', color: 'white' }}
@@ -265,7 +300,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
           {/* Schedule Section */}
           <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
             <div className="flex items-center justify-between mb-2.5">
-              <h2 className="text-base font-bold" style={{ color: '#1F271B' }}>Schedule</h2>
+              <h2 className="text-lg font-bold" style={{ color: '#1F271B' }}>Schedule</h2>
               <button
                 className="px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
                 style={{ backgroundColor: '#28AFB0', color: 'white' }}
@@ -308,16 +343,12 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
             <h2 className="text-base font-bold mb-2.5" style={{ color: '#1F271B' }}>Contact info</h2>
             <div className="space-y-1.5">
               <div>
-                <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Company name</p>
-                <p className="text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Main</p>
+                <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Phone</p>
                 <p className="text-xs" style={{ color: '#1F271B' }}>{client.phone}</p>
               </div>
               {client.email && (
                 <div>
-                  <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Main</p>
+                  <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Email</p>
                   <p className="text-xs" style={{ color: '#1F271B' }}>{client.email}</p>
                 </div>
               )}
@@ -334,6 +365,58 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
           <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
             <h2 className="text-base font-bold mb-2.5" style={{ color: '#1F271B' }}>Last client communication</h2>
             <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>You haven't sent any client communications yet</p>
+          </div>
+
+          {/* Customer reminder */}
+          <div className="bg-white rounded shadow-sm border p-3" style={{ borderColor: '#EAEBED' }}>
+            <h2 className="text-base font-bold mb-0.5" style={{ color: '#1F271B' }}>Customer reminder</h2>
+            <p className="text-xs mb-2.5" style={{ color: '#1F271B', opacity: 0.7 }}>Remind me to follow up on this client in future date</p>
+            {!reminder ? (
+              <button
+                type="button"
+                onClick={() => { setEditingReminder(false); setIsSetReminderOpen(true) }}
+                className="w-full px-3 py-2 border border-dashed rounded text-xs font-medium transition-colors"
+                style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#28AFB0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#EAEBED' }}
+              >
+                Set customer reminder
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs" style={{ color: reminderDue ? '#DC2626' : '#1F271B' }}>
+                  {format(new Date(reminder.date + (reminder.time ? `T${reminder.time}` : '')), 'MMM d, yyyy · HH:mm')}
+                  {reminder.note && ` · ${reminder.note}`}
+                </p>
+                {reminderDue && (
+                  <p className="text-xs font-medium" style={{ color: '#DC2626' }}>Status: Follow up</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingReminder(true); setIsSetReminderOpen(true) }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                    style={{ color: '#1F271B', border: '1px solid #EAEBED' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <FiEdit size={10} />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteReminder(clientId)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                    style={{ color: '#DC2626', border: '1px solid #EAEBED' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FEF2F2' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <FiTrash2 size={10} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Internal Notes */}
@@ -369,6 +452,18 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
         isOpen={isAddWorkorderOpen}
         onClose={() => setIsAddWorkorderOpen(false)}
         initialClientId={clientId}
+      />
+      <SendMessageModal
+        isOpen={isSendMessageOpen}
+        onClose={() => setIsSendMessageOpen(false)}
+        clientIds={[clientId]}
+      />
+      <SetCustomerReminderModal
+        isOpen={isSetReminderOpen}
+        onClose={() => { setIsSetReminderOpen(false); setEditingReminder(false) }}
+        clientId={clientId}
+        initialReminder={editingReminder ? reminder : null}
+        onSave={(r) => { setReminder(clientId, r); setIsSetReminderOpen(false); setEditingReminder(false) }}
       />
     </div>
   )

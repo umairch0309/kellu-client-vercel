@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FiPlus, FiSearch, FiChevronRight, FiChevronUp, FiChevronDown, FiDownload, FiUpload, FiTrash2, FiFile, FiArchive } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiChevronRight, FiChevronUp, FiChevronDown, FiDownload, FiUpload, FiTrash2, FiArchive, FiMail, FiFlag, FiMoreVertical } from 'react-icons/fi'
 import { mockClients } from '@/data/mockData'
+import { useClientReminders } from '@/context/ClientRemindersContext'
 import AddClientModal from './AddClientModal'
+import AddWorkorderModal from './AddWorkorderModal'
+import SendMessageModal from './SendMessageModal'
 
 type NameSortOption = 'first-az' | 'first-za' | 'last-az' | 'last-za'
 type LastActivitySortOption = 'newest' | 'oldest'
@@ -17,10 +20,15 @@ export default function ClientsList() {
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
   const [isAddClientOpen, setIsAddClientOpen] = useState(false)
+  const [isSendMessageOpen, setIsSendMessageOpen] = useState(false)
+  const [sendMessageClientIds, setSendMessageClientIds] = useState<number[]>([])
+  const [openRowActionsId, setOpenRowActionsId] = useState<number | null>(null)
+  const [addWorkorderClientId, setAddWorkorderClientId] = useState<number | null>(null)
   const [selectedClientIds, setSelectedClientIds] = useState<Set<number>>(new Set())
   const [nameSort, setNameSort] = useState<NameSortOption>('first-az')
   const [lastActivitySort, setLastActivitySort] = useState<LastActivitySortOption>('newest')
   const [sortByColumn, setSortByColumn] = useState<'name' | 'lastActivity'>('name')
+  const [hoveredRowId, setHoveredRowId] = useState<number | null>(null)
   const [isNameSortOpen, setIsNameSortOpen] = useState(false)
   const [isLastActivitySortOpen, setIsLastActivitySortOpen] = useState(false)
   const moreActionsRef = useRef<HTMLDivElement>(null)
@@ -28,6 +36,13 @@ export default function ClientsList() {
   const nameSortRef = useRef<HTMLDivElement>(null)
   const lastActivitySortRef = useRef<HTMLDivElement>(null)
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null)
+  const { getReminder, isReminderDue } = useClientReminders()
+
+  // Effective status: "Follow up" when reminder is due
+  const getDisplayStatus = (client: (typeof mockClients)[0]) => {
+    const r = getReminder(client.id)
+    return r && isReminderDue(r) ? 'Follow Up' : client.status
+  }
 
   // Open Add Client modal when navigating from /clients/new (redirected with ?new=1)
   useEffect(() => {
@@ -39,13 +54,23 @@ export default function ClientsList() {
 
   // Calculate stats
   const totalClients = mockClients.length
+  const newClientsLast30Days = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 30)
+    return mockClients.filter(c => {
+      const created = (c as { createdAt?: string }).createdAt
+      if (!created) return false
+      return new Date(created) >= cutoff
+    }).length
+  }, [])
 
   const filteredClients = mockClients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          client.phone.includes(searchTerm) ||
                          (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (client.address && client.address.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesStatus = !statusFilter || client.status === statusFilter
+    const displayStatus = getDisplayStatus(client)
+    const matchesStatus = !statusFilter || displayStatus === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -126,6 +151,12 @@ export default function ClientsList() {
     setSelectedClientIds(new Set())
   }
 
+  const handleMarkAsFollowUp = () => {
+    if (selectedClientIds.size === 0) return
+    alert(`Mark ${selectedClientIds.size} selected client(s) as Follow-up. (Static UI – not implemented.)`)
+    setSelectedClientIds(new Set())
+  }
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -142,10 +173,16 @@ export default function ClientsList() {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) {
         setIsStatusDropdownOpen(false)
       }
+      if (openRowActionsId !== null) {
+        const el = (target as Element).closest?.('[data-row-actions]')
+        if (!el || (el as HTMLElement).dataset?.clientId !== String(openRowActionsId)) {
+          setOpenRowActionsId(null)
+        }
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isMoreActionsOpen, isNameSortOpen, isLastActivitySortOpen, isStatusDropdownOpen])
+  }, [isMoreActionsOpen, isNameSortOpen, isLastActivitySortOpen, isStatusDropdownOpen, openRowActionsId])
 
   useEffect(() => {
     const el = selectAllCheckboxRef.current
@@ -235,24 +272,32 @@ export default function ClientsList() {
                   <FiDownload size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
                   <span>Export Clients</span>
                 </button>
-                <button
-                  onClick={() => { handleArchiveSelected(); setIsMoreActionsOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors flex items-center gap-2 border-t"
-                  style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <FiArchive size={14} style={{ color: '#1F271B', opacity: 0.7 }} />
-                  <span>Archive Clients</span>
-                </button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Summary Card */}
-      <div className="grid grid-cols-1 gap-3">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+        <div 
+          className="rounded shadow-sm border overflow-hidden cursor-pointer transition-all hover:shadow-md max-w-xs"
+          style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <div className="h-0.5" style={{ backgroundColor: '#2B50AA' }}></div>
+          <div className="p-3">
+            <div className="flex justify-between items-start mb-1.5">
+              <div>
+                <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>New clients</p>
+                <p className="text-[10px] mt-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Last 30 days</p>
+              </div>
+              <FiChevronRight size={12} className="transition-transform" style={{ color: '#1F271B', opacity: 0.5 }} />
+            </div>
+            <span className="text-xl font-bold" style={{ color: '#1F271B' }}>{newClientsLast30Days}</span>
+          </div>
+        </div>
         <div 
           className="rounded shadow-sm border overflow-hidden cursor-pointer transition-all hover:shadow-md max-w-xs"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
@@ -386,21 +431,39 @@ export default function ClientsList() {
               <div className="flex items-center gap-2 ml-2">
                 <button
                   type="button"
+                  onClick={() => { setSendMessageClientIds(Array.from(selectedClientIds)); setIsSendMessageOpen(true) }}
+                  className="p-1.5 rounded hover:bg-black/5 transition-colors"
+                  title="Send message"
+                  style={{ color: '#1F271B' }}
+                >
+                  <FiMail size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkAsFollowUp}
+                  className="p-1.5 rounded hover:bg-black/5 transition-colors"
+                  title="Mark as Follow-up"
+                  style={{ color: '#1F271B' }}
+                >
+                  <FiFlag size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleArchiveSelected}
+                  className="p-1.5 rounded hover:bg-black/5 transition-colors border"
+                  title="Archived clients"
+                  style={{ color: '#1F271B', borderColor: '#EAEBED', backgroundColor: 'rgba(0,0,0,0.02)' }}
+                >
+                  <FiArchive size={16} />
+                </button>
+                <button
+                  type="button"
                   onClick={handleDeleteSelected}
                   className="p-1.5 rounded hover:bg-black/5 transition-colors"
                   title="Delete selected"
                   style={{ color: '#1F271B' }}
                 >
                   <FiTrash2 size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleArchiveSelected}
-                  className="p-1.5 rounded hover:bg-black/5 transition-colors"
-                  title="Archive selected"
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiFile size={16} />
                 </button>
               </div>
             </div>
@@ -479,7 +542,6 @@ export default function ClientsList() {
                       )}
                     </div>
                   </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Address</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Status</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold border-b relative" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>
                     <div className="flex items-center gap-1 relative" ref={lastActivitySortRef}>
@@ -522,57 +584,129 @@ export default function ClientsList() {
                       )}
                     </div>
                   </th>
+                  <th className="px-2 py-2.5 w-10 border-b" style={{ borderColor: '#EAEBED' }} aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
-                {sortedClients.map((client) => (
-                  <tr
-                    key={client.id}
-                    onClick={() => handleRowClick(client.id)}
-                    className="border-b cursor-pointer transition-all"
-                    style={{ 
-                      borderColor: '#EAEBED', 
-                      backgroundColor: 'white',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB'
-                      e.currentTarget.style.boxShadow = 'inset 2px 0 0 #28AFB0'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
-                  >
-                    <td className="px-2 py-2.5 w-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedClientIds.has(client.id)}
-                        onChange={() => {}}
-                        onClick={(e) => { e.stopPropagation(); toggleClientSelection(e as unknown as React.MouseEvent, client.id) }}
-                        className="w-3.5 h-3.5 rounded focus:ring-1 cursor-pointer"
-                        style={{ borderColor: '#EAEBED' }}
-                      />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs" style={{ color: '#1F271B', opacity: 0.8 }}>
-                      {client.address || <span style={{ opacity: 0.5 }}>No address</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shadow-sm" style={{ 
-                        backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : client.status === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
-                        color: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B'
-                      }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
-                        {client.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
-                      {client.lastActivity}
-                    </td>
-                  </tr>
-                ))}
+                {sortedClients.map((client) => {
+                  const isRowHovered = hoveredRowId === client.id
+                  const clickableCellProps = {
+                    onClick: () => handleRowClick(client.id),
+                    onMouseEnter: () => setHoveredRowId(client.id),
+                    onMouseLeave: () => setHoveredRowId(null),
+                    className: 'px-3 py-2.5 cursor-pointer transition-all',
+                    style: { borderColor: '#EAEBED' as const },
+                  }
+                  return (
+                    <tr
+                      key={client.id}
+                      className="border-b transition-all"
+                      style={{
+                        borderColor: '#EAEBED',
+                        backgroundColor: isRowHovered ? '#F9FAFB' : 'white',
+                        boxShadow: isRowHovered ? 'inset 2px 0 0 #28AFB0' : 'none',
+                      }}
+                    >
+                      <td className="px-2 py-2.5 w-10 border-b" style={{ borderColor: '#EAEBED', backgroundColor: 'white' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedClientIds.has(client.id)}
+                          onChange={() => {}}
+                          onClick={(e) => { e.stopPropagation(); toggleClientSelection(e as unknown as React.MouseEvent, client.id) }}
+                          className="w-3.5 h-3.5 rounded focus:ring-1 cursor-pointer"
+                          style={{ borderColor: '#EAEBED' }}
+                        />
+                      </td>
+                      <td {...clickableCellProps}>
+                        <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
+                      </td>
+                      <td {...clickableCellProps}>
+                        {(() => {
+                          const displayStatus = getDisplayStatus(client)
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shadow-sm" style={{
+                              backgroundColor: displayStatus === 'Active' ? 'rgba(40, 175, 176, 0.2)' : displayStatus === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                              color: displayStatus === 'Active' ? '#1E8A8B' : displayStatus === 'Follow Up' ? '#8B6AA3' : '#1F271B'
+                            }}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: displayStatus === 'Active' ? '#1E8A8B' : displayStatus === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
+                              {displayStatus}
+                            </span>
+                          )
+                        })()}
+                      </td>
+                      <td {...clickableCellProps}>
+                        <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{client.lastActivity}</span>
+                      </td>
+                      <td
+                        className="px-2 py-2.5 w-10 border-b align-middle"
+                        style={{ borderColor: '#EAEBED', backgroundColor: isRowHovered ? '#F9FAFB' : 'white' }}
+                        data-row-actions
+                        data-client-id={client.id}
+                      >
+                        <div className="relative flex justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenRowActionsId(prev => prev === client.id ? null : client.id) }}
+                            className="p-1.5 rounded hover:bg-black/10 transition-colors"
+                            title="More actions"
+                            style={{ color: '#1F271B' }}
+                          >
+                            <FiMoreVertical size={16} />
+                          </button>
+                          {openRowActionsId === client.id && (
+                            <div
+                              className="absolute right-0 top-full mt-0.5 z-30 bg-white rounded shadow-lg border py-1 min-w-[180px]"
+                              style={{ borderColor: '#EAEBED', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowActionsId(null); setAddWorkorderClientId(client.id) }}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50"
+                                style={{ color: '#1F271B' }}
+                              >
+                                Create workorder
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowActionsId(null); setAddWorkorderClientId(client.id) }}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 border-t"
+                                style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                              >
+                                Create task
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowActionsId(null); alert('Create Quote (Static UI – not implemented)') }}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 border-t"
+                                style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                              >
+                                Create Quote
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowActionsId(null); alert('Create Invoice (Static UI – not implemented)') }}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 border-t"
+                                style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                              >
+                                Create Invoice
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setOpenRowActionsId(null); alert(`Archive ${client.name} (Static UI – not implemented.)`) }}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-gray-50 border-t"
+                                style={{ color: '#1F271B', borderTopColor: '#EAEBED' }}
+                              >
+                                <FiArchive size={14} style={{ opacity: 0.8 }} />
+                                Archived
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -582,17 +716,8 @@ export default function ClientsList() {
             {sortedClients.map((client) => (
               <div
                 key={client.id}
-                onClick={() => handleRowClick(client.id)}
-                className="p-3 cursor-pointer transition-all border-b flex gap-2"
+                className="p-3 border-b flex gap-2"
                 style={{ borderColor: '#EAEBED', backgroundColor: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
-                  e.currentTarget.style.boxShadow = 'inset 3px 0 0 #28AFB0'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
               >
                 <div className="flex-shrink-0 pt-0.5">
                   <input
@@ -604,25 +729,33 @@ export default function ClientsList() {
                     style={{ borderColor: '#EAEBED' }}
                   />
                 </div>
-                <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start mb-1.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer transition-all rounded"
+                  onClick={() => handleRowClick(client.id)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F9FAFB'
+                    e.currentTarget.style.boxShadow = 'inset 3px 0 0 #28AFB0'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-1.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2" style={{
+                      backgroundColor: getDisplayStatus(client) === 'Active' ? 'rgba(40, 175, 176, 0.2)' : getDisplayStatus(client) === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
+                      color: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B'
+                    }}>
+                      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
+                      {getDisplayStatus(client)}
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2" style={{ 
-                    backgroundColor: client.status === 'Active' ? 'rgba(40, 175, 176, 0.2)' : client.status === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
-                    color: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B'
-                  }}>
-                    <span className="w-1 h-1 rounded-full" style={{ backgroundColor: client.status === 'Active' ? '#1E8A8B' : client.status === 'Follow Up' ? '#8B6AA3' : '#1F271B' }}></span>
-                    {client.status}
-                  </span>
-                </div>
-                <p className="text-[10px] mb-1.5" style={{ color: '#1F271B', opacity: 0.8 }}>
-                  {client.address || 'No address'}
-                </p>
-                <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
+                  <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
                     Last Activity: {client.lastActivity}
-                </p>
+                  </p>
                 </div>
               </div>
             ))}
@@ -633,6 +766,17 @@ export default function ClientsList() {
         isOpen={isAddClientOpen}
         onClose={() => setIsAddClientOpen(false)}
         mode="new"
+      />
+      <AddWorkorderModal
+        isOpen={addWorkorderClientId !== null}
+        onClose={() => setAddWorkorderClientId(null)}
+        initialClientId={addWorkorderClientId ?? undefined}
+      />
+      <SendMessageModal
+        isOpen={isSendMessageOpen && sendMessageClientIds.length > 0}
+        onClose={() => { setIsSendMessageOpen(false); setSendMessageClientIds([]) }}
+        clientIds={sendMessageClientIds}
+        onSent={() => { setSelectedClientIds(new Set()); setSendMessageClientIds([]) }}
       />
     </div>
   )

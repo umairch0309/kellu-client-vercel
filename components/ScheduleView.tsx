@@ -408,9 +408,23 @@ export default function ScheduleView() {
         </div>
         <div className="flex-1 overflow-y-auto p-2.5">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <input type="checkbox" id="event-detail-completed" className="w-3 h-3 rounded focus:ring-1" style={{ borderColor: '#EAEBED' }} />
+            <input type="checkbox" id="event-detail-completed" className="w-3 h-3 rounded focus:ring-1" style={{ borderColor: '#EAEBED', accentColor: '#2B50AA' }} />
             <label htmlFor="event-detail-completed" className="text-xs cursor-pointer" style={{ color: '#1F271B' }}>Completed</label>
           </div>
+          {/* Date, time and assignation on the right - larger text */}
+          {selectedItem!.schedule?.day && (
+            <div className="flex justify-end mb-1.5">
+              <div className="text-right">
+                <p className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                  {format(new Date(selectedItem!.schedule.day), 'MMM d, yyyy')}
+                  {selectedItem!.schedule.startTime && ` ${selectedItem!.schedule.startTime}`}
+                </p>
+                <p className="text-sm font-medium mt-0.5" style={{ color: '#1F271B' }}>
+                  {eventDetailAssignedList.length > 0 ? `Assigned to ${eventDetailAssignedList.join(', ')}` : (selectedItem as any).assignedTeamMember ? `Assigned to ${(selectedItem as any).assignedTeamMember}` : 'Not assigned'}
+                </p>
+              </div>
+            </div>
+          )}
           {selectedItem!.clientName && (
             <div className="mb-1.5">
               <p className="text-xs" style={{ color: '#1F271B' }}>

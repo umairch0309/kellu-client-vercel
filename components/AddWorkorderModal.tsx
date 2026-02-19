@@ -455,6 +455,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
             {/* Address */}
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Address</label>
+              <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.6 }}>Fetched from last registered workorder or task of selected client</p>
               <input
                 type="text"
                 name="address"
@@ -576,7 +577,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                       />
                     </div>
                     <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Select team</span>
+                      <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Select</span>
                       <button
                         type="button"
                         onClick={() => assignedSet.size === assignOptions.length ? clearAssignSelection() : selectAllAssign()}
@@ -654,9 +655,13 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b transition-colors"
                                 style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                               >
-                                <div className="font-medium">{item.name}</div>
-                                <div className="text-xs truncate mt-0.5" style={{ color: '#6B7280' }}>{item.description}</div>
-                                <div className="text-xs mt-0.5" style={{ color: '#6B7280' }}>${(item.price || 0).toFixed(2)}</div>
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className="font-medium">{item.name}</span>
+                                  <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>${(item.price ?? 0).toFixed(2)}</span>
+                                </div>
+                                {item.description && (
+                                  <div className="text-xs mt-0.5 truncate" style={{ color: '#6B7280' }}>{item.description}</div>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -672,9 +677,13 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b transition-colors"
                                 style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                               >
-                                <div className="font-medium">{item.name}</div>
-                                <div className="text-xs truncate mt-0.5" style={{ color: '#6B7280' }}>{item.description}</div>
-                                <div className="text-xs mt-0.5" style={{ color: '#6B7280' }}>${(item.price || 0).toFixed(2)}</div>
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className="font-medium">{item.name}</span>
+                                  <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>${(item.price ?? 0).toFixed(2)}</span>
+                                </div>
+                                {item.description && (
+                                  <div className="text-xs mt-0.5 truncate" style={{ color: '#6B7280' }}>{item.description}</div>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -740,24 +749,42 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 </button>
               </div>
 
-              {/* Time Row - hidden when Anytime is checked; dropdown pickers only, validation: end > start */}
-              {!anytime && (
-                <div className="flex items-end gap-1.5">
-                  {/* Start Time - dropdown with hour / minute / AM-PM */}
-                  <div className="flex-1 relative" ref={startTimeDropdownRef}>
+              {/* Time Row - Start time (with Anytime below it) and End time */}
+              <div className="flex items-start gap-1.5">
+                {/* Start time + Anytime aligned below it */}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="relative" ref={startTimeDropdownRef}>
                     <label className="block text-xs font-medium text-neutral-dark/70 mb-0.5">Start time</label>
-                    <button
-                      type="button"
-                      onClick={() => { setIsStartTimeDropdownOpen(!isStartTimeDropdownOpen); setIsEndTimeDropdownOpen(false) }}
-                      className="w-full px-2 py-1 border border-neutral-light rounded text-left focus:outline-none focus:ring-1 focus:ring-primary text-sm flex items-center justify-between bg-white"
-                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                    >
-                      <span>{formData.startTime}</span>
-                      <FiChevronDown size={12} className={`opacity-60 ${isStartTimeDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
+                    {!anytime ? (
+                      <button
+                        type="button"
+                        onClick={() => { setIsStartTimeDropdownOpen(!isStartTimeDropdownOpen); setIsEndTimeDropdownOpen(false) }}
+                        className="w-full px-2 py-1 border border-neutral-light rounded text-left focus:outline-none focus:ring-1 focus:ring-primary text-sm flex items-center justify-between bg-white"
+                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      >
+                        <span>{formData.startTime}</span>
+                        <FiChevronDown size={12} className={`opacity-60 ${isStartTimeDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    ) : (
+                      <div className="w-full px-2 py-1 border border-transparent rounded text-sm" style={{ color: '#9CA3AF' }}>—</div>
+                    )}
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      id="anytime"
+                      checked={anytime}
+                      onChange={(e) => setAnytime(e.target.checked)}
+                      className="w-3 h-3 text-primary border-neutral-light rounded focus:ring-primary"
+                    />
+                    <label htmlFor="anytime" className="text-xs text-neutral-dark cursor-pointer">
+                      Anytime
+                    </label>
+                  </div>
+                </div>
 
-                  {/* End Time - dropdown; only register if end > start */}
+                {/* End Time - dropdown; only when !anytime */}
+                {!anytime && (
                   <div className="flex-1 relative" ref={endTimeDropdownRef}>
                     <label className="block text-xs font-medium text-neutral-dark/70 mb-0.5">End time</label>
                     <div className="flex items-center gap-0.5">
@@ -783,21 +810,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                     </div>
                     {!isEndValid && <p className="text-[10px] mt-0.5 text-red-500">End must be after start</p>}
                   </div>
-                </div>
-              )}
-
-              {/* Anytime Checkbox */}
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  id="anytime"
-                  checked={anytime}
-                  onChange={(e) => setAnytime(e.target.checked)}
-                  className="w-3 h-3 text-primary border-neutral-light rounded focus:ring-primary"
-                />
-                <label htmlFor="anytime" className="text-xs text-neutral-dark cursor-pointer">
-                  Anytime
-                </label>
+                )}
               </div>
             </div>
 

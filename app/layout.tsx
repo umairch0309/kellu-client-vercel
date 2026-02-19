@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import ClientProviders from '@/components/ClientProviders'
 
 export const metadata: Metadata = {
   title: 'Kellu - Business Management Platform',
@@ -16,7 +17,9 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <ClientProviders>{children}</ClientProviders>
+      </body>
     </html>
   )
 }

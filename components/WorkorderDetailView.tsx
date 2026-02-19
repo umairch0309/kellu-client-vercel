@@ -31,9 +31,11 @@ const TALLY_WORK_REPORT_BASE_URL = typeof process !== 'undefined' && process.env
   : 'https://tally.so'
 import { format } from 'date-fns'
 import { mockClients, mockWorkorders, mockMaterialsList, companyTaxRatePercent, quoteSettings, invoiceSettings } from '@/data/mockData'
+import { useClientReminders } from '@/context/ClientRemindersContext'
 import AddProductServiceModal, { type NewProductServiceData } from './AddProductServiceModal'
 import SendEmailModal, { type SendEmailModalType } from './SendEmailModal'
 import CreateJobReportModal from './CreateJobReportModal'
+import SetCustomerReminderModal from './SetCustomerReminderModal'
 
 interface WorkorderDetailViewProps {
   workorderId: number
@@ -57,8 +59,11 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [editingLineItemIndex, setEditingLineItemIndex] = useState<number | null>(null)
+  const [editingLineItemForm, setEditingLineItemForm] = useState<{ name: string; description: string; quantity: number; unitCost: number; unitPrice: number } | null>(null)
   const [editedLineItems, setEditedLineItems] = useState<any[]>([])
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
+  const [editingExpenseIndex, setEditingExpenseIndex] = useState<number | null>(null)
+  const [editedExpenses, setEditedExpenses] = useState<any[]>([])
   const [newExpense, setNewExpense] = useState({
     date: new Date().toISOString().split('T')[0],
     itemName: '',
@@ -80,6 +85,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   })
   const [quoteClientMessage, setQuoteClientMessage] = useState(() => quoteSettings?.clientMessage ?? '')
   const [quoteTermsAndConditions, setQuoteTermsAndConditions] = useState(() => quoteSettings?.termsAndConditions ?? '')
+  const [quoteRequired, setQuoteRequired] = useState(false)
   const [applyToAllFutureQuotes, setApplyToAllFutureQuotes] = useState(false)
   const [invoiceClientMessage, setInvoiceClientMessage] = useState(() => invoiceSettings?.clientMessage ?? '')
   const [invoiceTermsAndConditions, setInvoiceTermsAndConditions] = useState(() => invoiceSettings?.termsAndConditions ?? '')
@@ -92,6 +98,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const [isFetchingTallyWorkReport, setIsFetchingTallyWorkReport] = useState(false)
   const [tallyWorkReportSentAt, setTallyWorkReportSentAt] = useState<string | null>(null)
   const [sendingTallyWorkReport, setSendingTallyWorkReport] = useState(false)
+  const [isSetReminderOpen, setIsSetReminderOpen] = useState(false)
+  const [editingReminder, setEditingReminder] = useState(false)
+  const { getReminder, setReminder, deleteReminder, isReminderDue } = useClientReminders()
   const moreActionsRef = useRef<HTMLDivElement>(null)
   const lineItemNameDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -100,10 +109,12 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
 
   useEffect(() => {
     if (!workorder) return
-      setEditedLineItems([...workorder.lineItems])
-      setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
+    setEditedLineItems([...workorder.lineItems])
+    setEditedPayments(workorder.payments && Array.isArray(workorder.payments) ? [...workorder.payments] : [])
+    setEditedExpenses(Array.isArray(workorder.expenses) ? [...(workorder.expenses as any[])] : [])
     setQuoteClientMessage((workorder as any).quoteClientMessage ?? quoteSettings?.clientMessage ?? '')
     setQuoteTermsAndConditions((workorder as any).quoteTermsAndConditions ?? quoteSettings?.termsAndConditions ?? '')
+    setQuoteRequired((workorder as any).quoteRequired ?? false)
     setInvoiceClientMessage((workorder as any).invoiceClientMessage ?? invoiceSettings?.clientMessage ?? '')
     setInvoiceTermsAndConditions((workorder as any).invoiceTermsAndConditions ?? invoiceSettings?.termsAndConditions ?? '')
     setJobReportPdfUrl((workorder as any).jobReportPdfUrl ?? null)
@@ -146,8 +157,8 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
 
   const totalLineItemCost = workorder.lineItems.reduce((sum, item) => sum + (item.unitCost * item.quantity), 0)
   const totalLineItemPrice = workorder.lineItems.reduce((sum, item) => sum + item.total, 0)
-  const totalExpenses = Array.isArray(workorder.expenses) && workorder.expenses.length > 0 
-    ? (workorder.expenses as any[]).reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0) 
+  const totalExpenses = editedExpenses.length > 0
+    ? editedExpenses.reduce((sum: number, exp: any) => sum + (exp.total ?? exp.amount ?? 0), 0)
     : 0
   const totalLabor = (workorder as any).labor ?? 0
   const totalCost = totalLineItemCost + totalLabor + totalExpenses
@@ -254,18 +265,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   style={{ color: '#1F271B' }}
                 >
                   <FiExternalLink size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
-                  <span>Create Work report</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setSendEmailModalType('work-order-report')
-                    setIsMoreActionsOpen(false)
-                  }}
-                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors flex items-center gap-3" 
-                  style={{ color: '#1F271B' }}
-                >
-                  <FiFileText size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Send Work report</span>
+                  <span>Create Job report</span>
                 </button>
               </div>
             )}
@@ -359,29 +359,6 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 </div>
               </div>
 
-              {/* Payment Summary */}
-              {editedPayments.length > 0 && (
-                <div className="mb-4 pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
-                  <p className="text-xs font-medium mb-2" style={{ color: '#1F271B', opacity: 0.7 }}>Payment Summary</p>
-                  <div className="space-y-1">
-                    {editedPayments.map((payment: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between text-xs">
-                        <span style={{ color: '#1F271B', opacity: 0.8 }}>
-                          {format(new Date(payment.date), 'MMM dd, yyyy')} - {payment.method}
-                        </span>
-                        <span className="font-medium" style={{ color: '#1F271B' }}>
-                          Rs{payment.amount.toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between text-xs font-semibold pt-1 mt-1 border-t" style={{ borderTopColor: '#EAEBED' }}>
-                      <span style={{ color: '#1F271B' }}>Total Paid:</span>
-                      <span style={{ color: '#1F271B' }}>Rs{totalPayments.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Schedule Details */}
               <div className="pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
                 <div className="grid grid-cols-2 gap-4 mb-3">
@@ -425,42 +402,49 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 </button>
               </div>
                 <div className="border-b pb-4 mb-4" style={{ borderColor: '#EAEBED' }} />
-                <div className="flex flex-wrap items-start gap-6 md:gap-8">
-                <div>
-                  <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
-                    {profit < 0 ? '-' : ''}{profitMargin}%
-                  </p>
-                  <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
-                </div>
-                  <div className="flex flex-wrap gap-6 md:gap-8">
-                    <div>
-                      <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Total price</p>
-                      <p className="text-sm font-bold" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</p>
+                <div className="flex flex-wrap items-center gap-6 md:gap-8">
+                  <div>
+                    <p className="text-2xl font-bold mb-1" style={{ color: profit < 0 ? '#DC2626' : '#059669' }}>
+                      {profit < 0 ? '-' : ''}{profitMargin}%
+                    </p>
+                    <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit margin</p>
                   </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
-                      <div>
-                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Line Item Cost</p>
-                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalLineItemCost.toFixed(2)}</p>
-                  </div>
-                  </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
-                      <div>
-                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Labor</p>
-                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalLabor.toFixed(2)}</p>
-                      </div>
+                  <div className="flex flex-wrap items-start gap-6 md:gap-8">
+                    <div className="min-w-[90px] text-right">
+                      <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Total price</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: '#1F271B' }}>Rs{totalLineItemPrice.toFixed(2)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
-                      <div>
-                        <p className="text-xs font-medium mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Expenses</p>
-                        <p className="text-sm font-bold" style={{ color: '#1F271B' }}>- Rs{totalExpenses.toFixed(2)}</p>
+                    <div className="min-w-[90px] text-right">
+                      <div className="flex items-center justify-end gap-1.5 mb-1">
+                        <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                        <p className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Line Item Cost</p>
                       </div>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: '#1F271B' }}>- Rs{totalLineItemCost.toFixed(2)}</p>
+                    </div>
+                    <div className="min-w-[90px] text-right">
+                      <div className="flex items-center justify-end gap-1.5 mb-1">
+                        <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                        <p className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Labor</p>
+                      </div>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: '#1F271B' }}>- Rs{totalLabor.toFixed(2)}</p>
+                    </div>
+                    <div className="min-w-[90px] text-right">
+                      <div className="flex items-center justify-end gap-1.5 mb-1">
+                        <span className="shrink-0 rounded-sm" style={legendSquareStyle} />
+                        <p className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Expenses</p>
+                      </div>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: '#1F271B' }}>- Rs{totalExpenses.toFixed(2)}</p>
+                    </div>
+                    <div className="min-w-[90px] text-right">
+                      <div className="flex items-center justify-end gap-1.5 mb-1">
+                        <span className="shrink-0 rounded-sm" style={{ width: 8, height: 8, backgroundColor: '#059669', borderRadius: 1 }} />
+                        <p className="text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Profit</p>
+                      </div>
+                      <p className="text-sm font-bold tabular-nums px-2 py-1 rounded" style={{ color: profit < 0 ? '#DC2626' : '#059669', backgroundColor: '#E0F2F1' }}>= Rs{profit.toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
           )}
 
             {/* Line Items Section — white card */}
@@ -469,8 +453,12 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Line Items</h2>
               <button
                 onClick={() => {
+                  const opening = !isAddLineItemOpen
                   setIsAddLineItemOpen(!isAddLineItemOpen)
-                  if (isAddLineItemOpen) {
+                  if (opening) {
+                    setEditingLineItemIndex(null)
+                    setEditingLineItemForm(null)
+                  } else {
                     setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 })
                     setLineItemError('')
                   }
@@ -485,11 +473,11 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 }}
               >
                 <FiPlus size={12} />
-                <span>Add Line Item</span>
+                <span>New Line Item</span>
               </button>
             </div>
 
-            {/* Add New Line Item Form - Jobber-style: Name with materials dropdown, Description below, no Service box */}
+            {/* Add New Line Item Form */}
             {isAddLineItemOpen && (
               <div ref={lineItemNameDropdownRef} className="mb-4 p-4 border rounded-lg" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }}>
                 <div className="space-y-3">
@@ -534,8 +522,13 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                               className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b last:border-b-0"
                               style={{ color: '#1F271B', borderColor: '#EAEBED' }}
                             >
-                              <span className="font-medium">{m.name}</span>
-                              {m.unitPrice > 0 && <span className="text-xs ml-2 opacity-70">Rs{m.unitPrice.toFixed(2)}</span>}
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-medium">{m.name}</span>
+                                <span className="text-xs font-medium flex-shrink-0" style={{ opacity: 0.9 }}>Rs{(m.unitPrice ?? 0).toFixed(2)}</span>
+                              </div>
+                              {m.description && (
+                                <div className="text-xs mt-0.5 truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{m.description}</div>
+                              )}
                             </button>
                           ))}
                           {showCreateNew && (
@@ -637,87 +630,206 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               </div>
             )}
 
-            {/* Existing Line Items */}
+            {/* Line Items table — only table, no duplicate cards above */}
             {editedLineItems.length > 0 ? (
-              <div className="space-y-3">
-                {editedLineItems.map((item: any, index: number) => (
-                  <div key={index} className="p-3 border rounded" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium mb-1" style={{ color: '#1F271B' }}>{item.name}</p>
-                        {item.description && (
-                          <p className="text-xs mb-2" style={{ color: '#1F271B', opacity: 0.7 }}>{item.description}</p>
-                        )}
-                        <div className="flex items-center gap-4 text-xs">
-                          <span style={{ color: '#1F271B', opacity: 0.7 }}>Unit cost: <span className="font-medium">Rs{item.unitCost.toFixed(2)}</span></span>
-                          <span style={{ color: '#1F271B', opacity: 0.7 }}>Total: <span className="font-semibold">Rs{item.total.toFixed(2)}</span></span>
-                        </div>
-                      </div>
-                        <button
-                        type="button"
-                        onClick={() => setEditedLineItems(editedLineItems.filter((_, i) => i !== index))}
-                        className="p-2 rounded transition-colors"
-                        style={{ color: '#1F271B', opacity: 0.7 }}
-                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#FEE2E2' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.backgroundColor = 'transparent' }}
-                        title="Delete line"
-                      >
-                        <FiTrash2 size={18} />
-                        </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : !isAddLineItemOpen && (
-              <p className="text-sm py-4 text-center" style={{ color: '#1F271B', opacity: 0.6 }}>No line items</p>
-            )}
-
-            {/* Summary Table */}
-            {editedLineItems.length > 0 && (
-              <div className="mt-4 pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
+              <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
                         <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>PRODUCT / SERVICE</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>QUANTITY</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>COST</th>
-                        <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>PRICE</th>
+                        <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>QUANTITY</th>
+                        <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>
+                          COST <FiInfo size={10} className="inline ml-0.5 opacity-70" title="Line item cost" />
+                        </th>
+                        <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>
+                          PRICE <FiInfo size={10} className="inline ml-0.5 opacity-70" title="Unit price" />
+                        </th>
                         <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>TOTAL</th>
+                        <th className="w-10 py-2 px-2" aria-label="Actions" />
                       </tr>
                     </thead>
                     <tbody>
                       {editedLineItems.map((item: any, index: number) => (
-                        <tr key={index} className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
-                          <td className="py-2 px-2" style={{ color: '#1F271B' }}>{item.name}</td>
-                          <td className="py-2 px-2" style={{ color: '#1F271B' }}>{item.quantity}</td>
-                          <td className="py-2 px-2" style={{ color: '#1F271B' }}>Rs{(item.unitCost * item.quantity).toFixed(2)}</td>
-                          <td className="py-2 px-2" style={{ color: '#1F271B' }}>Rs{item.unitPrice.toFixed(2)}</td>
-                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{item.total.toFixed(2)}</td>
-                        </tr>
+                        editingLineItemIndex === index && editingLineItemForm ? (
+                          <tr key={index} className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
+                            <td colSpan={6} className="p-0 align-top">
+                              <div className="p-4 border rounded-lg" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }} onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Name <span className="text-red-500">*</span></label>
+                                    <input
+                                      type="text"
+                                      value={editingLineItemForm.name}
+                                      onChange={(e) => setEditingLineItemForm({ ...editingLineItemForm, name: e.target.value })}
+                                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm"
+                                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Description</label>
+                                    <textarea
+                                      value={editingLineItemForm.description}
+                                      onChange={(e) => setEditingLineItemForm({ ...editingLineItemForm, description: e.target.value })}
+                                      placeholder="Enter description"
+                                      rows={3}
+                                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm resize-none"
+                                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-2">
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quantity</label>
+                                      <input
+                                        type="number"
+                                        value={editingLineItemForm.quantity}
+                                        onChange={(e) => setEditingLineItemForm({ ...editingLineItemForm, quantity: parseFloat(e.target.value) || 0 })}
+                                        min="0"
+                                        step="0.01"
+                                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit cost</label>
+                                      <input
+                                        type="number"
+                                        value={editingLineItemForm.unitCost}
+                                        onChange={(e) => setEditingLineItemForm({ ...editingLineItemForm, unitCost: parseFloat(e.target.value) || 0 })}
+                                        min="0"
+                                        step="0.01"
+                                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Unit price</label>
+                                      <input
+                                        type="number"
+                                        value={editingLineItemForm.unitPrice}
+                                        onChange={(e) => setEditingLineItemForm({ ...editingLineItemForm, unitPrice: parseFloat(e.target.value) || 0 })}
+                                        min="0"
+                                        step="0.01"
+                                        className="w-full px-2 py-2 border rounded text-sm text-center"
+                                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Total</label>
+                                      <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+                                        Rs{(editingLineItemForm.quantity * editingLineItemForm.unitPrice).toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditedLineItems(editedLineItems.filter((_, i) => i !== index))
+                                        setEditingLineItemIndex(null)
+                                        setEditingLineItemForm(null)
+                                      }}
+                                      className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+                                      style={{ backgroundColor: '#DC2626', color: 'white' }}
+                                    >
+                                      <FiTrash2 size={14} />
+                                      Delete
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!editingLineItemForm.name.trim()) return
+                                        const total = editingLineItemForm.quantity * editingLineItemForm.unitPrice
+                                        const next = editedLineItems.map((li, i) => i === index ? { ...li, ...editingLineItemForm, total } : li)
+                                        setEditedLineItems(next)
+                                        setEditingLineItemIndex(null)
+                                        setEditingLineItemForm(null)
+                                      }}
+                                      className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+                                      style={{ backgroundColor: '#28AFB0', color: 'white' }}
+                                    >
+                                      <FiCheckCircle size={14} />
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr
+                            key={index}
+                            className="border-b align-top cursor-pointer transition-colors"
+                            style={{ borderBottomColor: '#EAEBED' }}
+                            onClick={() => {
+                              setIsAddLineItemOpen(false)
+                              setEditingLineItemIndex(index)
+                              setEditingLineItemForm({
+                                name: item.name,
+                                description: item.description || '',
+                                quantity: item.quantity,
+                                unitCost: item.unitCost,
+                                unitPrice: item.unitPrice,
+                              })
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = ''
+                            }}
+                          >
+                            <td className="py-2 px-2" style={{ color: '#1F271B' }}>
+                              <p className="font-semibold" style={{ color: '#28AFB0' }}>{item.name}</p>
+                              {item.description && (
+                                <p className="text-xs mt-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>{item.description}</p>
+                              )}
+                            </td>
+                            <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>{item.quantity}</td>
+                            <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{(item.unitCost * item.quantity).toFixed(2)}</td>
+                            <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{item.unitPrice.toFixed(2)}</td>
+                            <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{item.total.toFixed(2)}</td>
+                            <td className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => setEditedLineItems(editedLineItems.filter((_, i) => i !== index))}
+                                className="p-1.5 rounded transition-colors"
+                                style={{ color: '#1F271B', opacity: 0.7 }}
+                                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#FEE2E2' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                                title="Delete line"
+                              >
+                                <FiTrash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
                       ))}
+                      {/* Summary rows: no PRICE column — Cost and Total only */}
                       <tr className="font-semibold border-t" style={{ borderTopColor: '#EAEBED' }}>
                         <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Subtotal</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2)}</td>
+                        <td className="py-2 px-2" />
                       </tr>
                         <tr>
                           <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>
-                          Discount{workorder.discount > 0 ? ` (${workorder.discountType === 'percentage' ? `${workorder.discount}%` : 'Amount'})` : ''}
+                            Discount{workorder.discount > 0 ? ` (${workorder.discountType === 'percentage' ? `${workorder.discount}%` : 'Amount'})` : ''}
                           </td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
-                          {workorder.discount > 0
-                            ? `-Rs${workorder.discountType === 'percentage'
-                              ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
+                            {workorder.discount > 0
+                              ? `-Rs${workorder.discountType === 'percentage'
+                                ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
                                 : workorder.discount.toFixed(2)}`
-                            : '—'}
+                              : '—'}
                           </td>
+                          <td className="py-2 px-2" />
                         </tr>
                         <tr>
                           <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Tax ({companyTaxRatePercent}%)</td>
                           <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>—</td>
-                          <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>
+                          <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>
                             Rs{(() => {
                               const st = editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0)
                               const disc = workorder.discount > 0 ? (workorder.discountType === 'percentage' ? (st * workorder.discount / 100) : workorder.discount) : 0
@@ -725,17 +837,43 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                               return (afterDisc * companyTaxRatePercent / 100).toFixed(2)
                             })()}
                           </td>
+                          <td className="py-2 px-2" />
                         </tr>
-                      <tr className="font-bold border-t" style={{ borderTopColor: '#EAEBED' }}>
-                        <td colSpan={3} className="py-2 px-2" style={{ color: '#1F271B' }}>Total</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
-                        <td className="py-2 px-2 text-right" style={{ color: '#1F271B' }}>Rs{workorder.total.toFixed(2)}</td>
+                      <tr className="font-bold border-t-2" style={{ borderTopColor: '#EAEBED' }}>
+                        <td colSpan={3} className="py-2.5 px-2" style={{ color: '#1F271B' }}>Total</td>
+                        <td className="py-2.5 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + (item.unitCost * item.quantity), 0).toFixed(2)}</td>
+                        <td className="py-2.5 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{workorder.total.toFixed(2)}</td>
+                        <td className="py-2.5 px-2" />
                       </tr>
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setEditingLineItemIndex(null)
+                      setEditingLineItemForm(null)
+                      setIsAddLineItemOpen(true)
+                      setNewLineItem({ name: '', description: '', quantity: 1, unitPrice: 0, unitCost: 0 })
+                      setLineItemError('')
+                    }}
+                    className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
+                    style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F0FDFA'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }}
+                  >
+                    <FiPlus size={12} />
+                    <span>New Line Item</span>
+                  </button>
+                </div>
+              </>
+            ) : !isAddLineItemOpen ? (
+              <p className="text-sm py-4 text-center" style={{ color: '#1F271B', opacity: 0.6 }}>No line items</p>
+            ) : null}
           </div>
 
             {/* Expenses Section — white card */}
@@ -744,6 +882,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Expenses</h2>
               <button
                 onClick={() => {
+                  setEditingExpenseIndex(null)
                   setNewExpense({
                     date: new Date().toISOString().split('T')[0],
                     itemName: '',
@@ -768,15 +907,241 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 <span>New Expense</span>
               </button>
             </div>
-            <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>
+            <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
               Get an accurate picture of various job costs by recording expenses
             </p>
+            {editedExpenses.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#EAEBED' }}>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left" style={{ borderColor: '#EAEBED', backgroundColor: '#F9FAFB' }}>
+                      <th className="py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Date</th>
+                      <th className="py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Item</th>
+                      <th className="py-2 px-2 font-medium text-right" style={{ color: '#1F271B', opacity: 0.7 }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editedExpenses.map((exp: any, index: number) => (
+                      <tr
+                        key={index}
+                        className="border-b cursor-pointer transition-colors"
+                        style={{ borderColor: '#EAEBED' }}
+                        onClick={() => {
+                          setEditingExpenseIndex(index)
+                          setNewExpense({
+                            date: (exp.date || new Date().toISOString().split('T')[0]).toString().slice(0, 10),
+                            itemName: exp.itemName || '',
+                            details: exp.details || '',
+                            total: exp.total ?? exp.amount ?? 0,
+                            linkedWorkorder: workorderId || (exp.linkedWorkorder ?? null),
+                            invoiceNumber: exp.invoiceNumber || '',
+                            attachment: null,
+                          })
+                          setIsAddExpenseOpen(true)
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
+                      >
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{exp.date ? format(new Date(exp.date), 'MMM d, yyyy') : '—'}</td>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{exp.itemName || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{(exp.total ?? exp.amount ?? 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            </div>
+          </div>
+
+          {/* Payments Section — below Expenses */}
+          <div id="payments" className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Payments</h2>
+              <button
+                onClick={() => {
+                  setNewPayment({
+                    date: new Date().toISOString().split('T')[0],
+                    amount: 0,
+                    method: 'Cash',
+                    reference: '',
+                    notes: '',
+                  })
+                  setEditingPaymentIndex(null)
+                  setIsAddPaymentOpen(true)
+                }}
+                className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
+                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F0FDFA'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                <FiPlus size={12} />
+                <span>Add Payment</span>
+              </button>
+            </div>
+            {editedPayments.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
+                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>DATE</th>
+                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>AMOUNT</th>
+                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>METHOD</th>
+                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>REFERENCE</th>
+                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>NOTES</th>
+                      <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editedPayments.map((payment: any, index: number) => (
+                      <tr key={index} className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{format(new Date(payment.date), 'MMM dd, yyyy')}</td>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>Rs{payment.amount.toFixed(2)}</td>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.method}</td>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.reference || '—'}</td>
+                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.notes || '—'}</td>
+                        <td className="py-2 px-2 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setNewPayment({ ...payment })
+                                setEditingPaymentIndex(index)
+                                setIsAddPaymentOpen(true)
+                              }}
+                              className="text-xs px-2 py-1 rounded transition-all"
+                              style={{ color: '#28AFB0', backgroundColor: 'transparent' }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#F0FDFA'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                const updatedPayments = editedPayments.filter((_, i) => i !== index)
+                                setEditedPayments(updatedPayments)
+                              }}
+                              className="text-xs px-2 py-1 rounded transition-all"
+                              style={{ color: '#DC2626', backgroundColor: 'transparent' }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#FEE2E2'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-3 pt-3 border-t flex justify-between items-center" style={{ borderTopColor: '#EAEBED' }}>
+                  <span className="text-sm font-semibold" style={{ color: '#1F271B' }}>Total Paid:</span>
+                  <span className="text-sm font-bold" style={{ color: '#1F271B' }}>
+                    Rs{totalPayments.toFixed(2)}
+                  </span>
+                </div>
+                {isInvoicePaid && (
+                  <div className="mt-2 p-2 rounded text-xs text-center" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>
+                    Invoice fully paid
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm py-4 text-center" style={{ color: '#1F271B', opacity: 0.6 }}>
+                No payments recorded. Click &quot;Add Payment&quot; to record a payment.
+              </p>
+            )}
+          </div>
+
+          {/* Complete Summary — single value column (no PRICE column) */}
+          <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
+            <h2 className="text-sm font-semibold mb-4" style={{ color: '#1F271B' }}>Summary</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Subtotal</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Discount{workorder.discount > 0 ? (workorder.discountType === 'percentage' ? ` (${workorder.discount}%)` : ' (Amount)') : ''}</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>
+                  {workorder.discount > 0
+                    ? `-Rs${workorder.discountType === 'percentage'
+                      ? ((editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0) * workorder.discount / 100)).toFixed(2)
+                      : workorder.discount.toFixed(2)}`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Tax ({companyTaxRatePercent}%)</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>
+                  Rs{(() => {
+                    const st = editedLineItems.reduce((sum: number, item: any) => sum + item.total, 0)
+                    const disc = workorder.discount > 0 ? (workorder.discountType === 'percentage' ? (st * workorder.discount / 100) : workorder.discount) : 0
+                    const afterDisc = st - disc
+                    return (afterDisc * companyTaxRatePercent / 100).toFixed(2)
+                  })()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center font-semibold">
+                <span style={{ color: '#1F271B' }}>Total</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{workorder.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Cost</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{(editedLineItems.reduce((s: number, i: any) => s + (i.unitCost * i.quantity), 0) + totalLabor + totalExpenses).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Expenses</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{totalExpenses.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>Estimated Margin</span>
+                <span className="tabular-nums" style={{ color: (workorder.total - (editedLineItems.reduce((s: number, i: any) => s + (i.unitCost * i.quantity), 0) + totalLabor + totalExpenses)) < 0 ? '#DC2626' : '#059669' }}>
+                  Rs{(workorder.total - (editedLineItems.reduce((s: number, i: any) => s + (i.unitCost * i.quantity), 0) + totalLabor + totalExpenses)).toFixed(2)}
+                </span>
+              </div>
+              <div className="my-4" style={{ borderTop: '2px dashed rgba(31, 39, 27, 0.4)' }} />
+              {editedPayments.length > 0 && (
+                <div className="pl-4 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span style={{ color: '#1F271B', opacity: 0.8 }}>Payments</span>
+                    <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{totalPayments.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-between items-center font-bold pt-2">
+                <span style={{ color: '#1F271B' }}>Balance</span>
+                <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{(workorder.total - totalPayments).toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
           {/* Quote Section - grouped with grey background, main heading "Quote", above Invoices */}
           <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
-            <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Quote</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Quote</h2>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={quoteRequired}
+                  onChange={(e) => setQuoteRequired(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                  style={{ accentColor: '#28AFB0' }}
+                />
+                <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Quote required</span>
+              </label>
+            </div>
             <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
               <h3 className="text-sm font-semibold mb-2" style={{ color: '#1F271B' }}>Client message</h3>
               <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Client message</label>
@@ -928,145 +1293,6 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                           </button>
                 </div>
               </div>
-            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
-              <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Internal notes (invoice)</h3>
-              <p className="text-xs mb-2" style={{ color: '#1F271B', opacity: 0.6 }}>
-                Visible only to your team. Not sent to the client.
-              </p>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Internal notes</label>
-              <textarea
-                value={invoiceInternalNote}
-                onChange={(e) => setInvoiceInternalNote(e.target.value)}
-                placeholder="e.g. payment terms, special instructions..."
-                rows={3}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all resize-none"
-                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#28AFB0'
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              />
-              </div>
-            <div className="rounded-lg border p-4 bg-white" style={{ borderColor: '#EAEBED' }}>
-              <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Attachments (invoice)</h3>
-              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-                Files added in the &quot;Attachments&quot; section above are included when you send this invoice to the client.
-              </p>
-            </div>
-          </div>
-
-          {/* Payments Section */}
-          <div id="payments" className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Payments</h2>
-              <button
-                onClick={() => {
-                  setNewPayment({
-                    date: new Date().toISOString().split('T')[0],
-                    amount: 0,
-                    method: 'Cash',
-                    reference: '',
-                    notes: '',
-                  })
-                  setEditingPaymentIndex(null)
-                  setIsAddPaymentOpen(true)
-                }}
-                className="px-3 py-1.5 border rounded text-xs font-medium flex items-center gap-1.5 transition-all"
-                style={{ borderColor: '#28AFB0', color: '#28AFB0', backgroundColor: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F0FDFA'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white'
-                }}
-              >
-                <FiPlus size={12} />
-                <span>Add Payment</span>
-              </button>
-            </div>
-            {editedPayments.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>DATE</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>AMOUNT</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>METHOD</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>REFERENCE</th>
-                      <th className="text-left py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>NOTES</th>
-                      <th className="text-right py-2 px-2 font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editedPayments.map((payment: any, index: number) => (
-                      <tr key={index} className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{format(new Date(payment.date), 'MMM dd, yyyy')}</td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>Rs{payment.amount.toFixed(2)}</td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.method}</td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.reference || '—'}</td>
-                        <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.notes || '—'}</td>
-                        <td className="py-2 px-2 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => {
-                                setNewPayment({ ...payment })
-                                setEditingPaymentIndex(index)
-                                setIsAddPaymentOpen(true)
-                              }}
-                              className="text-xs px-2 py-1 rounded transition-all"
-                              style={{ color: '#28AFB0', backgroundColor: 'transparent' }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#F0FDFA'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent'
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => {
-                                const updatedPayments = editedPayments.filter((_, i) => i !== index)
-                                setEditedPayments(updatedPayments)
-                              }}
-                              className="text-xs px-2 py-1 rounded transition-all"
-                              style={{ color: '#DC2626', backgroundColor: 'transparent' }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#FEE2E2'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent'
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="mt-3 pt-3 border-t flex justify-between items-center" style={{ borderTopColor: '#EAEBED' }}>
-                  <span className="text-sm font-semibold" style={{ color: '#1F271B' }}>Total Paid:</span>
-                  <span className="text-sm font-bold" style={{ color: '#1F271B' }}>
-                    Rs{totalPayments.toFixed(2)}
-                  </span>
-                </div>
-                {isInvoicePaid && (
-                  <div className="mt-2 p-2 rounded text-xs text-center" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>
-                    Invoice fully paid
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm py-4 text-center" style={{ color: '#1F271B', opacity: 0.6 }}>
-                No payments recorded. Click "Add Payment" to record a payment.
-              </p>
-            )}
           </div>
 
           {/* Attachments Section - first */}
@@ -1338,19 +1564,84 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               )}
             </div>
           </div>
+
+          {/* Customer reminder (same as Client View – reminder is at customer level) */}
+          {workorder && (
+            <div className="bg-white rounded-lg shadow-md border p-4 mt-3" style={{ borderColor: '#EAEBED' }}>
+              <h2 className="text-sm font-semibold mb-0.5" style={{ color: '#1F271B' }}>Customer reminder</h2>
+              <p className="text-xs mb-2.5" style={{ color: '#1F271B', opacity: 0.7 }}>Remind me to follow up on this client in future date</p>
+              {(() => {
+                const clientId = workorder.clientId
+                const reminder = getReminder(clientId)
+                const reminderDue = reminder ? isReminderDue(reminder) : false
+                if (!reminder) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => { setEditingReminder(false); setIsSetReminderOpen(true) }}
+                      className="w-full px-3 py-2 border border-dashed rounded text-xs font-medium transition-colors"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#28AFB0' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.borderColor = '#EAEBED' }}
+                    >
+                      Set customer reminder
+                    </button>
+                  )
+                }
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs" style={{ color: reminderDue ? '#DC2626' : '#1F271B' }}>
+                      {format(new Date(reminder.date + (reminder.time ? `T${reminder.time}` : '')), 'MMM d, yyyy · HH:mm')}
+                      {reminder.note && ` · ${reminder.note}`}
+                    </p>
+                    {reminderDue && (
+                      <p className="text-xs font-medium" style={{ color: '#DC2626' }}>Status: Follow up</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setEditingReminder(true); setIsSetReminderOpen(true) }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                        style={{ color: '#1F271B', border: '1px solid #EAEBED' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <FiEdit size={10} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteReminder(clientId)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                        style={{ color: '#DC2626', border: '1px solid #EAEBED' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FEF2F2' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <FiTrash2 size={10} />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Add / Update Expense Modal — Linked Work order hidden when adding from work order */}
       {isAddExpenseOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED' }}>
             {/* Header */}
             <div className="flex items-center justify-between p-3 border-b" style={{ borderBottomColor: '#EAEBED' }}>
-              <h2 className="text-base font-semibold" style={{ color: '#1F271B' }}>Add Expense</h2>
+              <h2 className="text-base font-semibold" style={{ color: '#1F271B' }}>
+                {editingExpenseIndex !== null ? 'Update Expense' : 'Add Expense'}
+              </h2>
               <button
                 onClick={() => {
                   setIsAddExpenseOpen(false)
+                  setEditingExpenseIndex(null)
                   setNewExpense({
                     date: new Date().toISOString().split('T')[0],
                     itemName: '',
@@ -1474,36 +1765,33 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                 />
               </div>
 
-              {/* Linked Workorder */}
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
-                  Linked Work order (when applies)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={newExpense.linkedWorkorder || ''}
-                    onChange={(e) => setNewExpense({ ...newExpense, linkedWorkorder: e.target.value ? parseInt(e.target.value) : null })}
-                    placeholder="Work order ID"
-                    min="1"
-                    className="flex-1 px-2.5 py-1.5 border rounded focus:outline-none focus:ring-2 text-xs transition-all"
-                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#28AFB0'
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#EAEBED'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
-                  />
-                  {workorder && (
-                    <span className="text-xs px-2 py-1 rounded whitespace-nowrap" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                      Current: #{workorder.id}
-                    </span>
-                  )}
+              {/* Linked Work order — only when not adding from a work order (e.g. standalone expense) */}
+              {!workorderId && (
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
+                    Linked Work order (when applies)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={newExpense.linkedWorkorder || ''}
+                      onChange={(e) => setNewExpense({ ...newExpense, linkedWorkorder: e.target.value ? parseInt(e.target.value) : null })}
+                      placeholder="Work order ID"
+                      min="1"
+                      className="flex-1 px-2.5 py-1.5 border rounded focus:outline-none focus:ring-2 text-xs transition-all"
+                      style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#28AFB0'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#EAEBED'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Invoice Number */}
               <div>
@@ -1582,37 +1870,40 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2 p-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
-              <button
-                onClick={() => {
-                  setIsAddExpenseOpen(false)
-                  setNewExpense({
-                    date: new Date().toISOString().split('T')[0],
-                    itemName: '',
-                    details: '',
-                    total: 0,
-                    linkedWorkorder: workorderId || null,
-                    invoiceNumber: '',
-                    attachment: null,
-                  })
-                }}
-                className="px-3 py-1.5 border rounded text-xs font-medium transition-all"
-                style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (newExpense.itemName && newExpense.total > 0) {
-                    // In a real app, this would save to the database
-                    alert('Expense added successfully! (Static UI)')
+            <div className="flex items-center justify-between gap-2 p-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
+              <div className="flex items-center gap-2">
+                {editingExpenseIndex !== null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditedExpenses(editedExpenses.filter((_, i) => i !== editingExpenseIndex))
+                      setIsAddExpenseOpen(false)
+                      setEditingExpenseIndex(null)
+                      setNewExpense({
+                        date: new Date().toISOString().split('T')[0],
+                        itemName: '',
+                        details: '',
+                        total: 0,
+                        linkedWorkorder: workorderId || null,
+                        invoiceNumber: '',
+                        attachment: null,
+                      })
+                    }}
+                    className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+                    style={{ backgroundColor: '#DC2626', color: 'white' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#B91C1C' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#DC2626' }}
+                  >
+                    <FiTrash2 size={14} />
+                    Delete
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
                     setIsAddExpenseOpen(false)
+                    setEditingExpenseIndex(null)
                     setNewExpense({
                       date: new Date().toISOString().split('T')[0],
                       itemName: '',
@@ -1622,20 +1913,61 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                       invoiceNumber: '',
                       attachment: null,
                     })
-                  }
-                }}
-                className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
-                style={{ backgroundColor: '#28AFB0', color: 'white' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1E8A8B'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#28AFB0'
-                }}
-              >
-                <FiCheckCircle size={14} />
-                <span>Save Expense</span>
-              </button>
+                  }}
+                  className="px-3 py-1.5 border rounded text-xs font-medium transition-all"
+                  style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (newExpense.itemName && newExpense.total > 0) {
+                      const payload = {
+                        date: newExpense.date,
+                        itemName: newExpense.itemName,
+                        details: newExpense.details,
+                        total: newExpense.total,
+                        amount: newExpense.total,
+                        linkedWorkorder: workorderId || newExpense.linkedWorkorder,
+                        invoiceNumber: newExpense.invoiceNumber,
+                      }
+                      if (editingExpenseIndex !== null) {
+                        setEditedExpenses(editedExpenses.map((e, i) => i === editingExpenseIndex ? payload : e))
+                      } else {
+                        setEditedExpenses([...editedExpenses, payload])
+                      }
+                      setIsAddExpenseOpen(false)
+                      setEditingExpenseIndex(null)
+                      setNewExpense({
+                        date: new Date().toISOString().split('T')[0],
+                        itemName: '',
+                        details: '',
+                        total: 0,
+                        linkedWorkorder: workorderId || null,
+                        invoiceNumber: '',
+                        attachment: null,
+                      })
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+                  style={{ backgroundColor: '#28AFB0', color: 'white' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#1E8A8B'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#28AFB0'
+                  }}
+                >
+                  <FiCheckCircle size={14} />
+                  <span>{editingExpenseIndex !== null ? 'Save' : 'Save Expense'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1934,6 +2266,15 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               setIsCreateJobReportModalOpen(false)
             }}
           />
+      )}
+      {workorder && (
+        <SetCustomerReminderModal
+          isOpen={isSetReminderOpen}
+          onClose={() => { setIsSetReminderOpen(false); setEditingReminder(false) }}
+          clientId={workorder.clientId}
+          initialReminder={editingReminder ? getReminder(workorder.clientId) : null}
+          onSave={(r) => { setReminder(workorder.clientId, r); setIsSetReminderOpen(false); setEditingReminder(false) }}
+        />
       )}
     </div>
   )

@@ -56,7 +56,7 @@ export default function EditClientForm({ clientId }: EditClientFormProps) {
   }
 
   const handleCancel = () => {
-    router.push('/clients')
+    router.push(`/clients/${clientId}`)
   }
 
   if (!client) {
