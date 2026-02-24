@@ -24,6 +24,8 @@ export default function WorkordersList() {
     'not sent': mockWorkorders.filter(w => w.quoteStatus === 'not sent').length,
     'waiting for approval': mockWorkorders.filter(w => w.quoteStatus === 'waiting for approval').length,
     'approved': mockWorkorders.filter(w => w.quoteStatus === 'approved').length,
+    'rejected': mockWorkorders.filter((w: any) => w.quoteStatus === 'rejected').length,
+    'expired': mockWorkorders.filter((w: any) => w.quoteStatus === 'expired').length,
   }
 
   const jobStats = {
@@ -95,6 +97,7 @@ export default function WorkordersList() {
     if (type === 'quote') {
       if (status === 'approved') return teal
       if (status === 'waiting for approval') return purple
+      if (status === 'rejected' || status === 'expired') return { bg: 'rgba(239, 68, 68, 0.15)', text: '#DC2626' }
       return gray
     }
     if (type === 'job') {
@@ -276,7 +279,7 @@ export default function WorkordersList() {
                 <FiChevronDown size={12} className={`transition-transform ${isQuoteDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#1F271B', opacity: 0.6 }} />
               </button>
               {isQuoteDropdownOpen && (
-                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
+                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px] py-1" style={{ borderColor: '#EAEBED' }}>
                   <button
                     onClick={() => {
                       setQuoteStatusFilter('all')
@@ -298,18 +301,18 @@ export default function WorkordersList() {
                     All
                   </button>
                   {Object.keys(quoteStats).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        setQuoteStatusFilter(status)
-                        setIsQuoteDropdownOpen(false)
-                      }}
-                      className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors border-t"
-                      style={{ 
-                        color: '#1F271B', 
-                        backgroundColor: quoteStatusFilter === status ? '#F3F4F6' : 'white',
-                        borderTopColor: '#EAEBED'
-                      }}
+                    <span key={status}>
+                      <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
+                      <button
+                        onClick={() => {
+                          setQuoteStatusFilter(status)
+                          setIsQuoteDropdownOpen(false)
+                        }}
+                        className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors"
+                        style={{ 
+                          color: '#1F271B', 
+                          backgroundColor: quoteStatusFilter === status ? '#F3F4F6' : 'white'
+                        }}
                       onMouseEnter={(e) => {
                         if (quoteStatusFilter !== status) {
                           e.currentTarget.style.backgroundColor = '#F9FAFB'
@@ -320,9 +323,10 @@ export default function WorkordersList() {
                           e.currentTarget.style.backgroundColor = 'white'
                         }
                       }}
-                    >
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </button>
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -357,7 +361,7 @@ export default function WorkordersList() {
                 <FiChevronDown size={12} className={`transition-transform ${isJobDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#1F271B', opacity: 0.6 }} />
               </button>
               {isJobDropdownOpen && (
-                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
+                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px] py-1" style={{ borderColor: '#EAEBED' }}>
                   <button
                     onClick={() => {
                       setJobStatusFilter('all')
@@ -379,18 +383,18 @@ export default function WorkordersList() {
                     All
                   </button>
                   {Object.keys(jobStats).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        setJobStatusFilter(status)
-                        setIsJobDropdownOpen(false)
-                      }}
-                      className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors border-t"
-                      style={{ 
-                        color: '#1F271B', 
-                        backgroundColor: jobStatusFilter === status ? '#F3F4F6' : 'white',
-                        borderTopColor: '#EAEBED'
-                      }}
+                    <span key={status}>
+                      <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
+                      <button
+                        onClick={() => {
+                          setJobStatusFilter(status)
+                          setIsJobDropdownOpen(false)
+                        }}
+                        className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors"
+                        style={{ 
+                          color: '#1F271B', 
+                          backgroundColor: jobStatusFilter === status ? '#F3F4F6' : 'white'
+                        }}
                       onMouseEnter={(e) => {
                         if (jobStatusFilter !== status) {
                           e.currentTarget.style.backgroundColor = '#F9FAFB'
@@ -401,9 +405,10 @@ export default function WorkordersList() {
                           e.currentTarget.style.backgroundColor = 'white'
                         }
                       }}
-                    >
-                      {status}
-                    </button>
+                      >
+                        {status}
+                      </button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -438,7 +443,7 @@ export default function WorkordersList() {
                 <FiChevronDown size={12} className={`transition-transform ${isInvoiceDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#1F271B', opacity: 0.6 }} />
               </button>
               {isInvoiceDropdownOpen && (
-                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
+                <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px] py-1" style={{ borderColor: '#EAEBED' }}>
                   <button
                     onClick={() => {
                       setInvoiceStatusFilter('all')
@@ -460,18 +465,18 @@ export default function WorkordersList() {
                     All
                   </button>
                   {Object.keys(invoiceStats).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        setInvoiceStatusFilter(status)
-                        setIsInvoiceDropdownOpen(false)
-                      }}
-                      className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors border-t"
-                      style={{ 
-                        color: '#1F271B', 
-                        backgroundColor: invoiceStatusFilter === status ? '#F3F4F6' : 'white',
-                        borderTopColor: '#EAEBED'
-                      }}
+                    <span key={status}>
+                      <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
+                      <button
+                        onClick={() => {
+                          setInvoiceStatusFilter(status)
+                          setIsInvoiceDropdownOpen(false)
+                        }}
+                        className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-opacity-50 transition-colors"
+                        style={{ 
+                          color: '#1F271B', 
+                          backgroundColor: invoiceStatusFilter === status ? '#F3F4F6' : 'white'
+                        }}
                       onMouseEnter={(e) => {
                         if (invoiceStatusFilter !== status) {
                           e.currentTarget.style.backgroundColor = '#F9FAFB'
@@ -482,9 +487,10 @@ export default function WorkordersList() {
                           e.currentTarget.style.backgroundColor = 'white'
                         }
                       }}
-                    >
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </button>
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </button>
+                    </span>
                   ))}
                 </div>
               )}

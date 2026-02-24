@@ -103,6 +103,16 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
   const { getReminder, setReminder, deleteReminder, isReminderDue } = useClientReminders()
   const moreActionsRef = useRef<HTMLDivElement>(null)
   const lineItemNameDropdownRef = useRef<HTMLDivElement>(null)
+  const [quoteMarkAsOpen, setQuoteMarkAsOpen] = useState(false)
+  const [editedQuoteStatus, setEditedQuoteStatus] = useState<string | null>(null)
+  const quoteMarkAsRef = useRef<HTMLDivElement>(null)
+  const [isBookingConfirmationModalOpen, setIsBookingConfirmationModalOpen] = useState(false)
+  const [bookingConfirmationSent, setBookingConfirmationSent] = useState(false)
+  const [bookingSubject, setBookingSubject] = useState('')
+  const [bookingMessage, setBookingMessage] = useState('')
+  const [bookingSendMeCopy, setBookingSendMeCopy] = useState(false)
+  const [bookingSendWhatsApp, setBookingSendWhatsApp] = useState(false)
+  const [bookingIncludeTeamPictures, setBookingIncludeTeamPictures] = useState(false)
 
   const workorder = mockWorkorders.find(wo => wo.id === workorderId)
   const client = workorder ? mockClients.find(c => c.id === workorder.clientId) : null
@@ -122,7 +132,39 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
     setTallyWorkReportSentAt((workorder as any).tallyWorkReportSentAt ?? null)
     setInternalNote((workorder as any).internalNote ?? '')
     setInvoiceInternalNote((workorder as any).invoiceInternalNote ?? '')
+    setEditedQuoteStatus(null)
+    setBookingConfirmationSent((workorder as any).bookingConfirmationSent ?? false)
   }, [workorder])
+
+  // When opening booking confirmation modal, init subject and message
+  useEffect(() => {
+    if (!isBookingConfirmationModalOpen || !workorder || !client) return
+    setBookingMessage(`Dear ${client.name || 'Client'},
+
+Your booking has been confirmed for ${workorder.title || 'your job'}.
+
+Schedule Details:
+Date: ${format(new Date(workorder.schedule.day), 'MMMM dd, yyyy')}
+Time: ${workorder.schedule.startTime} - ${workorder.schedule.endTime}
+${workorder.assignedTeamMember ? `Assigned Team Member: ${workorder.assignedTeamMember}` : ''}
+
+Address:
+${workorder.address}
+
+We look forward to serving you!
+
+Best regards`)
+    setBookingSubject(`Booking Confirmation - ${workorder.title || 'Job'} - ${format(new Date(workorder.schedule.day), 'MMM dd, yyyy')}`)
+  }, [isBookingConfirmationModalOpen, workorder, client])
+
+  // Close Quote "Mark as" dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (quoteMarkAsRef.current && !quoteMarkAsRef.current.contains(e.target as Node)) setQuoteMarkAsOpen(false)
+    }
+    if (quoteMarkAsOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [quoteMarkAsOpen])
 
   // Seed 2–3 workorder attachments so the send-email modal can show opt-in/opt-out for this email
   useEffect(() => {
@@ -179,7 +221,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
       <div className="flex items-center justify-end p-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.push(`/workorders/${workorderId}/send-booking-confirmation`)}
+            onClick={() => setIsBookingConfirmationModalOpen(true)}
             className="px-2.5 py-1.5 rounded text-xs font-medium flex items-center gap-1.5 transition-all"
             style={{ backgroundColor: '#28AFB0', color: 'white' }}
             onMouseEnter={(e) => {
@@ -190,7 +232,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
             }}
           >
             <FiMail size={12} />
-            <span>Email Booking Confirmation</span>
+            <span>{bookingConfirmationSent || (workorder as any).bookingConfirmationSent ? 'Resend booking confirmation' : 'Booking confirmation'}</span>
           </button>
           <button
             onClick={() => router.push(`/workorders/${workorderId}/edit`)}
@@ -221,7 +263,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
               <FiMoreVertical size={12} />
             </button>
             {isMoreActionsOpen && (
-              <div className="absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[220px]" style={{ borderColor: '#EAEBED' }}>
+              <div className="absolute right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[220px] py-1" style={{ borderColor: '#EAEBED' }}>
                 <button 
                   onClick={() => {
                     setSendEmailModalType('quote')
@@ -231,8 +273,9 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   style={{ color: '#1F271B' }}
                 >
                   <FiSend size={16} style={{ color: '#1F271B', flexShrink: 0 }} />
-                  <span>Send Quote</span>
+                  <span>{(workorder.quoteDateSent || workorder.quoteStatus !== 'not sent') ? 'Resend Quote' : 'Send Quote'}</span>
                 </button>
+                <div className="border-t mx-2" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                 <button 
                   onClick={() => {
                     setSendEmailModalType('invoice')
@@ -244,6 +287,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   <FiDollarSign size={16} style={{ color: '#2B50AA', flexShrink: 0 }} />
                   <span>Send Invoice</span>
                 </button>
+                <div className="border-t mx-2" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                 <button 
                   onClick={() => {
                     setSendEmailModalType('job-follow')
@@ -255,6 +299,7 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
                   <FiMail size={16} style={{ color: '#28AFB0', flexShrink: 0 }} />
                   <span>Send Job Follow</span>
                 </button>
+                <div className="border-t mx-2" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                 <button 
                   onClick={() => {
                     const url = `${TALLY_WORK_REPORT_BASE_URL}${TALLY_WORK_REPORT_BASE_URL.includes('?') ? '&' : '?'}workorder=${workorderId}`
@@ -330,14 +375,61 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
 
               {/* Quote, Job, Invoice Status */}
               <div className="grid grid-cols-3 gap-3 mb-4 pt-4 border-t" style={{ borderTopColor: '#EAEBED' }}>
-                <div>
+                <div ref={quoteMarkAsRef} className="relative">
                   <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Quote Status</p>
-                  <span className="inline-block px-2 py-1 rounded-full text-xs font-medium" style={{ 
-                    backgroundColor: workorder.quoteStatus === 'approved' ? 'rgba(40, 175, 176, 0.2)' : workorder.quoteStatus === 'waiting for approval' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
-                    color: workorder.quoteStatus === 'approved' ? '#1E8A8B' : workorder.quoteStatus === 'waiting for approval' ? '#8B6AA3' : '#1F271B'
-                  }}>
-                    {workorder.quoteStatus}
-                  </span>
+                  {(() => {
+                    const displayStatus = editedQuoteStatus ?? workorder.quoteStatus
+                    const statusBg = displayStatus === 'approved' ? 'rgba(40, 175, 176, 0.2)' : displayStatus === 'waiting for approval' ? 'rgba(176, 132, 204, 0.2)' : displayStatus === 'rejected' || displayStatus === 'expired' ? 'rgba(239, 68, 68, 0.15)' : '#F3F4F6'
+                    const statusColor = displayStatus === 'approved' ? '#1E8A8B' : displayStatus === 'waiting for approval' ? '#8B6AA3' : displayStatus === 'rejected' || displayStatus === 'expired' ? '#DC2626' : '#1F271B'
+                    const markAsOptions: { value: string; label: string; icon: React.ReactNode }[] = []
+                    if (displayStatus === 'not sent' || displayStatus === 'rejected') {
+                      markAsOptions.push({ value: 'waiting for approval', label: 'Awaiting response', icon: <FiSend size={14} style={{ color: '#1F271B', flexShrink: 0 }} /> })
+                      markAsOptions.push({ value: 'approved', label: 'Approved Quote', icon: <FiCheckCircle size={14} style={{ color: '#059669', flexShrink: 0 }} /> })
+                    } else if (displayStatus === 'approved') {
+                      markAsOptions.push({ value: 'approved', label: 'Approved Quote', icon: <FiCheckCircle size={14} style={{ color: '#059669', flexShrink: 0 }} /> })
+                      markAsOptions.push({ value: 'rejected', label: 'Rejected Quote', icon: <FiX size={14} style={{ color: '#1F271B', flexShrink: 0 }} /> })
+                    } else {
+                      markAsOptions.push({ value: 'waiting for approval', label: 'Awaiting response', icon: <FiSend size={14} style={{ color: '#1F271B', flexShrink: 0 }} /> })
+                      markAsOptions.push({ value: 'rejected', label: 'Rejected Quote', icon: <FiX size={14} style={{ color: '#1F271B', flexShrink: 0 }} /> })
+                    }
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setQuoteMarkAsOpen(!quoteMarkAsOpen) }}
+                          className="inline-block px-2 py-1 rounded-full text-xs font-medium text-left transition-colors"
+                          style={{ backgroundColor: statusBg, color: statusColor }}
+                        >
+                          {displayStatus === 'waiting for approval' ? 'Awaiting response' : displayStatus === 'not sent' ? 'Not sent' : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                        </button>
+                        {quoteMarkAsOpen && (
+                          <div className="absolute left-0 top-full mt-1 z-50 bg-white border rounded-lg shadow-lg py-1 min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
+                            <p className="px-3 py-2 text-xs font-medium" style={{ color: '#1F271B', opacity: 0.7 }}>Mark as...</p>
+                            <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
+                            {markAsOptions.map((opt, i) => (
+                              <span key={opt.value}>
+                                {i > 0 && <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditedQuoteStatus(opt.value)
+                                    const wo = mockWorkorders.find(w => w.id === workorderId) as any
+                                    if (wo) wo.quoteStatus = opt.value
+                                    setQuoteMarkAsOpen(false)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-3"
+                                  style={{ color: '#1F271B' }}
+                                >
+                                  {opt.icon}
+                                  <span>{opt.label}</span>
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Job Status</p>
@@ -1628,6 +1720,100 @@ export default function WorkorderDetailView({ workorderId }: WorkorderDetailView
           )}
         </div>
       </div>
+
+      {/* Booking confirmation modal */}
+      {isBookingConfirmationModalOpen && workorder && client && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED' }}>
+            <div className="flex items-center justify-between p-3 border-b" style={{ borderBottomColor: '#EAEBED' }}>
+              <h2 className="text-base font-semibold" style={{ color: '#1F271B' }}>
+                {bookingConfirmationSent || (workorder as any).bookingConfirmationSent ? 'Resend booking confirmation' : 'Booking confirmation'}
+              </h2>
+              <button
+                onClick={() => setIsBookingConfirmationModalOpen(false)}
+                className="p-1 rounded transition-colors"
+                style={{ color: '#1F271B', opacity: 0.6 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                  e.currentTarget.style.backgroundColor = '#F3F4F6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.6'
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>To</label>
+                <input
+                  type="email"
+                  value={client.email || ''}
+                  disabled
+                  className="w-full px-2.5 py-1.5 border rounded text-sm bg-gray-100"
+                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Subject</label>
+                <input
+                  type="text"
+                  value={bookingSubject}
+                  onChange={(e) => setBookingSubject(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border rounded text-sm"
+                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Message</label>
+                <textarea
+                  value={bookingMessage}
+                  onChange={(e) => setBookingMessage(e.target.value)}
+                  rows={8}
+                  className="w-full px-2.5 py-1.5 border rounded text-sm resize-y"
+                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                />
+              </div>
+              <div className="space-y-2 pt-1 border-t" style={{ borderColor: '#EAEBED' }}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={bookingIncludeTeamPictures} onChange={(e) => setBookingIncludeTeamPictures(e.target.checked)} className="rounded" />
+                  <span className="text-sm" style={{ color: '#1F271B' }}>Include team pictures</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={bookingSendMeCopy} onChange={(e) => setBookingSendMeCopy(e.target.checked)} className="rounded" />
+                  <span className="text-sm" style={{ color: '#1F271B' }}>Send me a copy</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={bookingSendWhatsApp} onChange={(e) => setBookingSendWhatsApp(e.target.checked)} className="rounded" />
+                  <span className="text-sm" style={{ color: '#1F271B' }}>Send via WhatsApp</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 p-3 border-t" style={{ borderColor: '#EAEBED' }}>
+              <button
+                onClick={() => setIsBookingConfirmationModalOpen(false)}
+                className="px-3 py-1.5 rounded text-sm font-medium border"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  ;(workorder as any).bookingConfirmationSent = true
+                  setBookingConfirmationSent(true)
+                  setIsBookingConfirmationModalOpen(false)
+                }}
+                className="px-3 py-1.5 rounded text-sm font-medium text-white"
+                style={{ backgroundColor: '#28AFB0' }}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add / Update Expense Modal — Linked Work order hidden when adding from work order */}
       {isAddExpenseOpen && (

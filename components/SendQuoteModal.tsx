@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FiX, FiDownload, FiPaperclip, FiMail, FiMessageCircle, FiFileText } from 'react-icons/fi'
 import { format } from 'date-fns'
 
@@ -12,23 +12,35 @@ interface SendQuoteModalProps {
   onQuoteSent: (quotePdfLink: string) => void
 }
 
-export default function SendQuoteModal({ isOpen, onClose, workorder, client, onQuoteSent }: SendQuoteModalProps) {
-  const [emailMessage, setEmailMessage] = useState(`Dear ${client?.name || 'Client'},
+function buildQuoteEmailMessage(workorder: any, client: any) {
+  const totalAmount = workorder?.total ?? (workorder?.lineItems?.reduce((sum: number, item: any) => sum + item.total, 0) || 0)
+  const paymentsTotal = (workorder?.payments && Array.isArray(workorder.payments))
+    ? workorder.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) : 0
+  const balance = totalAmount - paymentsTotal
+  const hasPayments = paymentsTotal > 0
+  const totalsBlock = hasPayments
+    ? `Total: Rs${totalAmount.toFixed(2)}\nPayments: Rs${paymentsTotal.toFixed(2)}\nBalance: Rs${balance.toFixed(2)}`
+    : `Total: Rs${totalAmount.toFixed(2)}`
+  return `Dear ${client?.name || 'Client'},
 
 Please find attached the quotation for ${workorder?.title || 'your job'}.
 
 Line Items:
 ${workorder?.lineItems?.map((item: any) => `- ${item.name}: ${item.quantity} x Rs${item.unitPrice.toFixed(2)} = Rs${item.total.toFixed(2)}`).join('\n') || ''}
 
-Total: Rs${workorder?.lineItems?.reduce((sum: number, item: any) => sum + item.total, 0).toFixed(2) || '0.00'}
+${totalsBlock}
 
 Payment Information:
 Please make payment via bank transfer or check. Payment details will be provided upon approval.
 
 Thank you for your business.
 
-Best regards`)
-  const [subject, setSubject] = useState(`Quotation for ${workorder?.title || 'Job'} - ${workorder?.quoteNumber || `Q-${workorder?.id}`}`)
+Best regards`
+}
+
+export default function SendQuoteModal({ isOpen, onClose, workorder, client, onQuoteSent }: SendQuoteModalProps) {
+  const [emailMessage, setEmailMessage] = useState(() => (workorder && client ? buildQuoteEmailMessage(workorder, client) : ''))
+  const [subject, setSubject] = useState(() => `Quotation for ${workorder?.title || 'Job'} - ${workorder?.quoteNumber || `Q-${workorder?.id}`}`)
   const [sender, setSender] = useState('company@example.com') // Should come from Settings
   const [replyTo, setReplyTo] = useState('company@example.com') // Should come from Settings
   const [sendMeCopy, setSendMeCopy] = useState(false)
@@ -36,6 +48,13 @@ Best regards`)
   const [attachments, setAttachments] = useState<string[]>([])
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
   const [quotePdfLink, setQuotePdfLink] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isOpen && workorder && client) {
+      setEmailMessage(buildQuoteEmailMessage(workorder, client))
+      setSubject(`Quotation for ${workorder.title || 'Job'} - ${workorder.quoteNumber || `Q-${workorder.id}`}`)
+    }
+  }, [isOpen, workorder, client])
 
   if (!isOpen) return null
 
@@ -70,8 +89,6 @@ Best regards`)
     setAttachments([...attachments, newAttachment])
   }
 
-  const totalAmount = workorder?.lineItems?.reduce((sum: number, item: any) => sum + item.total, 0) || 0
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED' }}>
@@ -103,7 +120,7 @@ Best regards`)
               <div>
                 <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Quote PDF</h3>
                 <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
-                  {quotePdfLink ? 'PDF generated successfully' : 'Generate PDF quotation with line items'}
+                  {quotePdfLink ? 'PDF generated successfully' : 'Generate PDF quotation with line items. When payments have been recorded, the PDF shows Total, Payments, and Balance (as in the summary).'}
                 </p>
               </div>
               <div className="flex items-center gap-2">

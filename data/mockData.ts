@@ -205,6 +205,7 @@ export const mockWorkorders = [
     quoteNumber: '',
     quoteDateSent: '',
     quoteWhatsappStatus: '',
+    quoteRequired: true,
     invoiceStatus: 'not sent',
     invoiceNumber: '',
     invoiceDateSent: '',

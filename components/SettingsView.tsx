@@ -213,13 +213,41 @@ function ScheduleSettings() {
   )
 }
 
+const SEND_WHATSAPP_DEFAULT_KEY = 'kellu_send_whatsapp_default'
+
 function CommunicationsSettings() {
+  const [sendWhatsAppByDefault, setSendWhatsAppByDefault] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = localStorage.getItem(SEND_WHATSAPP_DEFAULT_KEY)
+    return v === null ? true : v === 'true'
+  })
+
+  const handleSave = () => {
+    localStorage.setItem(SEND_WHATSAPP_DEFAULT_KEY, String(sendWhatsAppByDefault))
+  }
+
   return (
     <div className="space-y-6 pb-8">
       <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Communications settings</h1>
       <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
         Opt in or out of reminders by type. When a reminder type is disabled, no reminders of that type will be sent.
       </p>
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Email & WhatsApp</h2>
+        <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>
+          Default options when sending quote or invoice emails.
+        </p>
+        <label className="flex items-center justify-between gap-4 cursor-pointer py-2 border-b" style={{ borderColor: '#EAEBED' }}>
+          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Send via WhatsApp by default (quote and invoice emails)</span>
+          <input
+            type="checkbox"
+            checked={sendWhatsAppByDefault}
+            onChange={(e) => setSendWhatsAppByDefault(e.target.checked)}
+            className="w-4 h-4 rounded"
+            style={{ accentColor: '#28AFB0' }}
+          />
+        </label>
+      </section>
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Reminders by type</h2>
         <div className="space-y-3">
@@ -242,7 +270,7 @@ function CommunicationsSettings() {
         </div>
       </section>
       <div className="flex justify-end">
-        <button type="button" className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
+        <button type="button" onClick={handleSave} className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
           <FiSave size={18} />
           Save changes
         </button>

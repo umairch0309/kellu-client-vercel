@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { FiX, FiChevronDown, FiChevronLeft, FiChevronRight, FiPlus, FiCheckCircle, FiTrash2, FiCheck } from 'react-icons/fi'
 import { format, parse, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, addDays, isSameMonth, isToday, isSameDay, subMonths, addMonths } from 'date-fns'
-import { mockClients, mockTeamMembers, mockMasterPriceList } from '@/data/mockData'
+import { mockClients, mockTeamMembers, mockMasterPriceList, mockWorkorders } from '@/data/mockData'
 import AddClientModal from './AddClientModal'
 
 function TimePickerColumn({ options, selected, onSelect }: { options: string[]; selected: string; onSelect: (value: string) => void }) {
@@ -36,9 +36,15 @@ interface AddWorkorderModalProps {
   initialTime?: string
   position?: { x: number; y: number }
   initialClientId?: number
+  /** When true, show only client/address/title/line items; no schedule, assign, or instructions. Quote is required by default. Save button becomes "Save Quote". */
+  /** When 'invoice-only', same as quote-only but creates work order with job Completed and invoice not sent (Invoice pending to send). Save button "Save Invoice". */
+  mode?: 'workorder' | 'quote-only' | 'invoice-only'
 }
 
-export default function AddWorkorderModal({ isOpen, onClose, initialDate, initialTime, position, initialClientId }: AddWorkorderModalProps) {
+export default function AddWorkorderModal({ isOpen, onClose, initialDate, initialTime, position, initialClientId, mode = 'workorder' }: AddWorkorderModalProps) {
+  const quoteOnly = mode === 'quote-only'
+  const invoiceOnly = mode === 'invoice-only'
+  const documentOnly = quoteOnly || invoiceOnly
   const router = useRouter()
   const [taskType, setTaskType] = useState<'workorder' | 'task'>('workorder')
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false)
@@ -255,6 +261,130 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (quoteOnly) {
+      // Create work order with only client, address, title, line items; quote required by default
+      const clientMatch = mockClients.find(c => c.name === formData.client)
+      const clientId = clientMatch?.id ?? 1
+      const clientName = formData.client || (clientMatch?.name ?? '')
+      const lineItems = formData.lineItems.map(item => ({
+        name: item.name,
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice ?? 0,
+        unitCost: 0,
+        total: (item.quantity || 1) * (item.unitPrice ?? 0),
+      }))
+      const subtotal = lineItems.reduce((sum, i) => sum + i.total, 0)
+      const newId = mockWorkorders.length > 0 ? Math.max(...mockWorkorders.map((w: any) => w.id)) + 1 : 1
+      const newWo = {
+        id: newId,
+        title: formData.title || 'Quote',
+        clientId,
+        clientName,
+        address: formData.address || '',
+        schedule: { day: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00' },
+        assignedTeamMember: '',
+        instructions: '',
+        lineItems,
+        subtotal,
+        discount: 0,
+        discountType: 'amount' as const,
+        tax: 0,
+        total: subtotal,
+        cost: 0,
+        estimateMargin: subtotal,
+        expenses: [],
+        notes: '',
+        quoteStatus: 'not sent' as const,
+        quoteNumber: '',
+        quoteDateSent: '',
+        quoteWhatsappStatus: '',
+        quoteRequired: true,
+        invoiceStatus: 'not sent' as const,
+        invoiceNumber: '',
+        invoiceDateSent: '',
+        invoiceWhatsappStatus: '',
+        jobStatus: 'Scheduled' as const,
+        payments: [],
+        createdAt: format(new Date(), 'yyyy-MM-dd'),
+        lastModified: format(new Date(), 'yyyy-MM-dd'),
+      }
+      mockWorkorders.push(newWo as any)
+      alert('Quote saved. Work order created.')
+      onClose()
+      setFormData({
+        client: '',
+        address: '',
+        title: '',
+        instructions: '',
+        assignedTeamMembers: [],
+        startDate: format(new Date(), 'MMM d, yyyy'),
+        startTime: '03:15 AM',
+        endTime: '04:15 AM',
+        lineItems: [],
+      })
+      return
+    }
+    if (invoiceOnly) {
+      const clientMatch = mockClients.find(c => c.name === formData.client)
+      const clientId = clientMatch?.id ?? 1
+      const clientName = formData.client || (clientMatch?.name ?? '')
+      const lineItems = formData.lineItems.map(item => ({
+        name: item.name,
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice ?? 0,
+        unitCost: 0,
+        total: (item.quantity || 1) * (item.unitPrice ?? 0),
+      }))
+      const subtotal = lineItems.reduce((sum, i) => sum + i.total, 0)
+      const newId = mockWorkorders.length > 0 ? Math.max(...mockWorkorders.map((w: any) => w.id)) + 1 : 1
+      const newWo = {
+        id: newId,
+        title: formData.title || 'Invoice',
+        clientId,
+        clientName,
+        address: formData.address || '',
+        schedule: { day: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00' },
+        assignedTeamMember: '',
+        instructions: '',
+        lineItems,
+        subtotal,
+        discount: 0,
+        discountType: 'amount' as const,
+        tax: 0,
+        total: subtotal,
+        cost: 0,
+        estimateMargin: subtotal,
+        expenses: [],
+        notes: '',
+        quoteStatus: 'approved' as const,
+        quoteNumber: `Q-${newId}`,
+        quoteDateSent: format(new Date(), 'yyyy-MM-dd'),
+        quoteWhatsappStatus: 'sent',
+        invoiceStatus: 'not sent' as const,
+        invoiceNumber: '',
+        invoiceDateSent: '',
+        invoiceWhatsappStatus: '',
+        jobStatus: 'Completed' as const,
+        payments: [],
+        createdAt: format(new Date(), 'yyyy-MM-dd'),
+        lastModified: format(new Date(), 'yyyy-MM-dd'),
+      }
+      mockWorkorders.push(newWo as any)
+      alert('Invoice saved. Work order created.')
+      onClose()
+      setFormData({
+        client: '',
+        address: '',
+        title: '',
+        instructions: '',
+        assignedTeamMembers: [],
+        startDate: format(new Date(), 'MMM d, yyyy'),
+        startTime: '03:15 AM',
+        endTime: '04:15 AM',
+        lineItems: [],
+      })
+      return
+    }
     if (!anytime && formData.endTime && !isEndValid) {
       alert('End time must be after start time.')
       return
@@ -350,6 +480,12 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
         {/* Header */}
         <div className="flex items-center justify-between p-2.5 border-b border-neutral-light">
           <div className="relative" ref={typeDropdownRef}>
+            {quoteOnly ? (
+              <span className="text-base font-semibold text-neutral-dark">New Quote</span>
+            ) : invoiceOnly ? (
+              <span className="text-base font-semibold text-neutral-dark">New Invoice</span>
+            ) : (
+              <>
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
               className="flex items-center gap-1.5 text-base font-semibold text-neutral-dark hover:text-neutral-dark/80 transition-colors"
@@ -383,6 +519,8 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                   <span>New Task</span>
                 </button>
               </div>
+            )}
+              </>
             )}
           </div>
           <button
@@ -481,8 +619,8 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               />
             </div>
 
-            {/* Add Instructions - button-like */}
-            {!showInstructions ? (
+            {/* Add Instructions - button-like (hidden in quote/invoice-only) */}
+            {!documentOnly && !showInstructions ? (
               <button
                 type="button"
                 onClick={() => setShowInstructions(true)}
@@ -494,7 +632,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 <FiPlus size={14} />
                 <span>Add Instructions</span>
               </button>
-            ) : (
+            ) : !documentOnly ? (
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Instructions</label>
                 <textarea
@@ -507,10 +645,10 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                   style={{ borderColor: '#EAEBED' }}
                 />
               </div>
-            )}
+            ) : null}
 
-            {/* Assign - Selected members as chips; + Assign button always visible (button-like); Filter-style popup */}
-            {!showAssign ? (
+            {/* Assign - Selected members as chips (hidden in quote/invoice-only) */}
+            {!documentOnly && !showAssign ? (
               <button
                 type="button"
                 onClick={() => setShowAssign(true)}
@@ -614,8 +752,8 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               </div>
             )}
 
-            {/* Line Items - only for Workorder: select from Product/Service settings only; no summary */}
-            {taskType === 'workorder' && (
+            {/* Line Items - for Workorder or Quote/Invoice-only */}
+            {(taskType === 'workorder' || documentOnly) && (
               <div ref={lineItemsSectionRef} className="space-y-3">
                 {/* + Add Line Item - always in same place; opens dropdown to select existing items only */}
                 <div ref={addLineItemDropdownRef} className="relative">
@@ -726,7 +864,8 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               </div>
             )}
 
-            {/* Scheduling Section */}
+            {/* Scheduling Section (hidden in quote/invoice-only) */}
+            {!documentOnly && (
             <div className="space-y-1.5 pt-0.5">
               {/* Start Date - opens calendar on press */}
               <div ref={startDateCalendarRef} className="relative">
@@ -813,9 +952,11 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
                 )}
               </div>
             </div>
+            )}
 
             {/* Footer Buttons */}
             <div className="flex justify-end gap-1.5 pt-2 border-t border-neutral-light">
+              {!documentOnly && (
               <button
                 type="button"
                 onClick={() => {
@@ -826,11 +967,12 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               >
                 More Options
               </button>
+              )}
               <button
                 type="submit"
                 className="px-2.5 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-xs font-medium"
               >
-                Save
+                {quoteOnly ? 'Save Quote' : invoiceOnly ? 'Save Invoice' : 'Save'}
               </button>
             </div>
           </form>

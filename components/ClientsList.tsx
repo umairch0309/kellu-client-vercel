@@ -344,7 +344,7 @@ export default function ClientsList() {
               </button>
               {isStatusDropdownOpen && (
                 <div
-                  className="absolute left-0 sm:right-0 mt-1 bg-white rounded shadow-lg border z-20 min-w-[160px]"
+                  className="absolute left-0 sm:right-0 mt-1 bg-white rounded shadow-lg border z-20 min-w-[160px] py-1"
                   style={{ borderColor: '#EAEBED', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                 >
                   <button
@@ -356,6 +356,7 @@ export default function ClientsList() {
                     All
                     {statusFilter === '' && <span className="text-green-600">✓</span>}
                   </button>
+                  <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <button
                     type="button"
                     onClick={() => { setStatusFilter('Active'); setIsStatusDropdownOpen(false) }}
@@ -365,6 +366,7 @@ export default function ClientsList() {
                     Active
                     {statusFilter === 'Active' && <span className="text-green-600">✓</span>}
                   </button>
+                  <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <button
                     type="button"
                     onClick={() => { setStatusFilter('Follow Up'); setIsStatusDropdownOpen(false) }}
@@ -374,6 +376,7 @@ export default function ClientsList() {
                     Follow-up
                     {statusFilter === 'Follow Up' && <span className="text-green-600">✓</span>}
                   </button>
+                  <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <button
                     type="button"
                     onClick={() => { setStatusFilter('Archive'); setIsStatusDropdownOpen(false) }}
@@ -499,7 +502,7 @@ export default function ClientsList() {
                       </button>
                       {isNameSortOpen && (
                         <div
-                          className="absolute mt-1 left-0 top-full bg-white rounded shadow-lg border z-20 min-w-[160px]"
+                          className="absolute mt-1 left-0 top-full bg-white rounded shadow-lg border z-20 min-w-[160px] py-1"
                           style={{ borderColor: '#EAEBED', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                         >
                           <button
@@ -511,6 +514,7 @@ export default function ClientsList() {
                             First name (A-Z)
                             {nameSort === 'first-az' && <span className="text-green-600">✓</span>}
                           </button>
+                          <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                           <button
                             type="button"
                             onClick={() => { setSortByColumn('name'); setNameSort('first-za'); setIsNameSortOpen(false) }}
@@ -520,6 +524,7 @@ export default function ClientsList() {
                             First name (Z-A)
                             {nameSort === 'first-za' && <span className="text-green-600">✓</span>}
                           </button>
+                          <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                           <button
                             type="button"
                             onClick={() => { setSortByColumn('name'); setNameSort('last-az'); setIsNameSortOpen(false) }}
@@ -529,6 +534,7 @@ export default function ClientsList() {
                             Last name (A-Z)
                             {nameSort === 'last-az' && <span className="text-green-600">✓</span>}
                           </button>
+                          <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                           <button
                             type="button"
                             onClick={() => { setSortByColumn('name'); setNameSort('last-za'); setIsNameSortOpen(false) }}
@@ -559,7 +565,7 @@ export default function ClientsList() {
                       </button>
                       {isLastActivitySortOpen && (
                         <div
-                          className="absolute mt-1 left-0 top-full bg-white rounded shadow-lg border z-20 min-w-[140px]"
+                          className="absolute mt-1 left-0 top-full bg-white rounded shadow-lg border z-20 min-w-[140px] py-1"
                           style={{ borderColor: '#EAEBED', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                         >
                           <button
@@ -571,6 +577,7 @@ export default function ClientsList() {
                             Newest first
                             {lastActivitySort === 'newest' && <span className="text-green-600">✓</span>}
                           </button>
+                          <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                           <button
                             type="button"
                             onClick={() => { setSortByColumn('lastActivity'); setLastActivitySort('oldest'); setIsLastActivitySortOpen(false) }}

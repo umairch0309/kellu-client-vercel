@@ -130,6 +130,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     <FiSettings size={16} style={{ opacity: 0.7 }} />
                     Settings
                   </Link>
+                  <div className="mx-3 my-1 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <Link
                     href="/settings"
                     onClick={() => setMenuOpen(false)}
@@ -138,6 +139,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   >
                     Manage Team
                   </Link>
+                  <div className="mx-3 my-1 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-black/5 transition-colors"

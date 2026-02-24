@@ -233,16 +233,18 @@ export default function SendMessageModal({
                     className="absolute left-0 top-full mt-1 z-10 bg-white border rounded shadow-lg py-1 min-w-[180px]"
                     style={{ borderColor: '#EAEBED' }}
                   >
-                    {VARIABLES.map(({ label, value }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => insertVariable(value)}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
-                        style={{ color: '#1F271B' }}
-                      >
-                        {label} ({value})
-                      </button>
+                    {VARIABLES.map(({ label, value }, i) => (
+                      <span key={value}>
+                        {i > 0 && <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />}
+                        <button
+                          type="button"
+                          onClick={() => insertVariable(value)}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+                          style={{ color: '#1F271B' }}
+                        >
+                          {label} ({value})
+                        </button>
+                      </span>
                     ))}
                   </div>
                 )}

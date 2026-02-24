@@ -26,7 +26,14 @@ export default function SendQuotePage({ workorderId }: SendQuotePageProps) {
 
   useEffect(() => {
     if (workorder && client) {
-      const totalAmount = workorder.lineItems?.reduce((sum: number, item: any) => sum + item.total, 0) || 0
+      const totalAmount = workorder.total ?? (workorder.lineItems?.reduce((sum: number, item: any) => sum + item.total, 0) || 0)
+      const paymentsTotal = (workorder.payments && Array.isArray(workorder.payments))
+        ? workorder.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) : 0
+      const balance = totalAmount - paymentsTotal
+      const hasPayments = paymentsTotal > 0
+      const totalsBlock = hasPayments
+        ? `Total: Rs${totalAmount.toFixed(2)}\nPayments: Rs${paymentsTotal.toFixed(2)}\nBalance: Rs${balance.toFixed(2)}`
+        : `Total: Rs${totalAmount.toFixed(2)}`
       setEmailMessage(`Dear ${client.name || 'Client'},
 
 Please find attached the quotation for ${workorder.title || 'your job'}.
@@ -34,7 +41,7 @@ Please find attached the quotation for ${workorder.title || 'your job'}.
 Line Items:
 ${workorder.lineItems?.map((item: any) => `- ${item.name}: ${item.quantity} x Rs${item.unitPrice.toFixed(2)} = Rs${item.total.toFixed(2)}`).join('\n') || ''}
 
-Total: Rs${totalAmount.toFixed(2)}
+${totalsBlock}
 
 Payment Information:
 Please make payment via bank transfer or check. Payment details will be provided upon approval.
@@ -120,7 +127,7 @@ Best regards`)
             <div>
               <h3 className="text-sm font-semibold mb-1" style={{ color: '#1F271B' }}>Quote PDF</h3>
               <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
-                {quotePdfLink ? 'PDF generated successfully' : 'Generate PDF quotation with line items'}
+                {quotePdfLink ? 'PDF generated successfully' : 'Generate PDF quotation with line items. When payments have been recorded, the PDF shows Total, Payments, and Balance (as in the summary).'}
               </p>
             </div>
             <div className="flex items-center gap-2">
