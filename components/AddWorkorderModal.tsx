@@ -8,7 +8,7 @@ import { format, parse, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval
 import { mockClients, mockTeamMembers, mockMasterPriceList, mockWorkorders } from '@/data/mockData'
 import AddClientModal from './AddClientModal'
 
-function TimePickerColumn({ options, selected, onSelect }: { options: string[]; selected: string; onSelect: (value: string) => void }) {
+function TimePickerColumn({ options, selected, onSelect }: { options: readonly string[]; selected: string; onSelect: (value: string) => void }) {
   return (
     <div className="flex-1 flex flex-col max-h-28 overflow-y-auto border rounded" style={{ borderColor: '#EAEBED' }}>
       {options.map((opt) => (
@@ -38,17 +38,28 @@ interface AddWorkorderModalProps {
   initialClientId?: number
   /** When true, show only client/address/title/line items; no schedule, assign, or instructions. Quote is required by default. Save button becomes "Save Quote". */
   /** When 'invoice-only', same as quote-only but creates work order with job Completed and invoice not sent (Invoice pending to send). Save button "Save Invoice". */
-  mode?: 'workorder' | 'quote-only' | 'invoice-only'
+  /** When 'task', same as workorder but no line items, no summary, no quote checkbox. Type dropdown hidden; footer shows Cancel + Save. */
+  mode?: 'workorder' | 'quote-only' | 'invoice-only' | 'task'
+  /** When saving a task (task mode or task type), called with task data so the parent can add it to a list. */
+  onTaskCreated?: (task: { title: string; clientName: string; address: string; instructions: string; assignedTo: string; startDate: string; startTime: string; endTime: string; anytime: boolean }) => void
+  /** When editing an existing task, pass the task so the form is pre-filled. Save will call onTaskUpdated instead of onTaskCreated. */
+  editingTask?: { id: number; title: string; clientName: string; address?: string; instructions?: string; assignedTo: string; dueDate: string }
+  /** When saving an existing task (editingTask set), called with task id and updated data. */
+  onTaskUpdated?: (taskId: number, task: { title: string; clientName: string; address: string; instructions: string; assignedTo: string; startDate: string; startTime: string; endTime: string; anytime: boolean }) => void
+  /** When converting the current task to a work order (editing only). Parent creates work order and can remove the task. */
+  onConvertToWorkorder?: (task: { title: string; clientName: string; address: string; instructions: string; assignedTo: string; startDate: string; startTime: string; endTime: string; anytime: boolean }) => void
 }
 
-export default function AddWorkorderModal({ isOpen, onClose, initialDate, initialTime, position, initialClientId, mode = 'workorder' }: AddWorkorderModalProps) {
+export default function AddWorkorderModal({ isOpen, onClose, initialDate, initialTime, position, initialClientId, mode = 'workorder', onTaskCreated, editingTask, onTaskUpdated, onConvertToWorkorder }: AddWorkorderModalProps) {
   const quoteOnly = mode === 'quote-only'
   const invoiceOnly = mode === 'invoice-only'
+  const taskOnly = mode === 'task'
   const documentOnly = quoteOnly || invoiceOnly
   const router = useRouter()
-  const [taskType, setTaskType] = useState<'workorder' | 'task'>('workorder')
+  const [taskType, setTaskType] = useState<'workorder' | 'task'>(taskOnly ? 'task' : 'workorder')
+  const effectiveTaskType = taskOnly ? 'task' : taskType
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false)
-  const [showInstructions, setShowInstructions] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(() => !!(taskOnly && editingTask?.instructions?.trim()))
   const [showAssign, setShowAssign] = useState(false)
   const [anytime, setAnytime] = useState(true)
   const [isAddLineItemDropdownOpen, setIsAddLineItemDropdownOpen] = useState(false)
@@ -102,7 +113,7 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
   // Assign options: Business owner + team members (no Unavailable - same as Filter)
   const assignOptions = [
     { value: 'Business owner', label: 'Business owner' },
-    ...mockTeamMembers.map(m => ({ value: m.name, label: m.name })),
+    ...mockTeamMembers.filter((m) => m.active).map(m => ({ value: m.name, label: m.name })),
   ]
   const filteredAssignOptions = assignOptions.filter(opt =>
     opt.label.toLowerCase().includes(assignSearchTerm.toLowerCase())
@@ -138,17 +149,40 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
       document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isTypeDropdownOpen, isClientDropdownOpen, isAssignDropdownOpen, isAddLineItemDropdownOpen, isStartDateCalendarOpen, isStartTimeDropdownOpen, isEndTimeDropdownOpen])
-  const [formData, setFormData] = useState({
-    client: '',
-    address: '',
-    title: '',
-    instructions: '',
-    assignedTeamMembers: [] as string[],
-    startDate: format(new Date(), 'MMM d, yyyy'),
-    startTime: '03:15 AM',
-    endTime: '04:15 AM',
-    lineItems: [] as Array<{ name: string; description: string; quantity: number; unitPrice: number }>,
-  })
+  const defaultFormData = () => {
+    if (taskOnly && editingTask) {
+      let startDateFormatted = format(new Date(), 'MMM d, yyyy')
+      try {
+        const d = parse(editingTask.dueDate, 'yyyy-MM-dd', new Date())
+        if (!isNaN(d.getTime())) startDateFormatted = format(d, 'MMM d, yyyy')
+      } catch {
+        // keep default
+      }
+      return {
+        client: editingTask.clientName,
+        address: editingTask.address ?? '',
+        title: editingTask.title,
+        instructions: editingTask.instructions ?? '',
+        assignedTeamMembers: editingTask.assignedTo ? editingTask.assignedTo.split(',').map(s => s.trim()).filter(Boolean) : [] as string[],
+        startDate: startDateFormatted,
+        startTime: '09:00 AM',
+        endTime: '10:00 AM',
+        lineItems: [] as Array<{ name: string; description: string; quantity: number; unitPrice: number }>,
+      }
+    }
+    return {
+      client: '',
+      address: '',
+      title: '',
+      instructions: '',
+      assignedTeamMembers: [] as string[],
+      startDate: format(new Date(), 'MMM d, yyyy'),
+      startTime: '03:15 AM',
+      endTime: '04:15 AM',
+      lineItems: [] as Array<{ name: string; description: string; quantity: number; unitPrice: number }>,
+    }
+  }
+  const [formData, setFormData] = useState(defaultFormData)
   const assignedSet = new Set(formData.assignedTeamMembers)
   const toggleAssignSelection = (value: string) => {
     const next = assignedSet.has(value)
@@ -258,6 +292,49 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
       setAnytime(!initialTime)
     }
   }, [isOpen, initialDate, initialTime, initialClientId])
+
+  // When opening in task mode: pre-fill from editingTask or reset for new task
+  useEffect(() => {
+    if (!isOpen || !taskOnly) return
+    if (editingTask) {
+      let startDateFormatted = format(new Date(), 'MMM d, yyyy')
+      try {
+        const d = parse(editingTask.dueDate, 'yyyy-MM-dd', new Date())
+        if (!isNaN(d.getTime())) startDateFormatted = format(d, 'MMM d, yyyy')
+      } catch {
+        // keep default
+      }
+      setFormData(prev => ({
+        ...prev,
+        client: editingTask.clientName,
+        address: editingTask.address ?? '',
+        title: editingTask.title,
+        instructions: editingTask.instructions ?? '',
+        assignedTeamMembers: editingTask.assignedTo ? editingTask.assignedTo.split(',').map(s => s.trim()).filter(Boolean) : [],
+        startDate: startDateFormatted,
+        startTime: '09:00 AM',
+        endTime: '10:00 AM',
+        lineItems: [],
+      }))
+      setShowInstructions(!!(editingTask.instructions && editingTask.instructions.trim()))
+      setAnytime(true)
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        client: '',
+        address: '',
+        title: '',
+        instructions: '',
+        assignedTeamMembers: [],
+        startDate: format(new Date(), 'MMM d, yyyy'),
+        startTime: '03:15 AM',
+        endTime: '04:15 AM',
+        lineItems: [],
+      }))
+      setShowInstructions(false)
+      setAnytime(true)
+    }
+  }, [isOpen, taskOnly, editingTask])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -389,10 +466,27 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
       alert('End time must be after start time.')
       return
     }
-    // Static form submission - just show success and close
-    alert(`${taskType === 'workorder' ? 'Workorder' : 'Task'} created successfully! (Static UI)`)
+    if (effectiveTaskType === 'task') {
+      const taskData = {
+        title: formData.title || 'Untitled Task',
+        clientName: formData.client || '',
+        address: formData.address || '',
+        instructions: formData.instructions || '',
+        assignedTo: formData.assignedTeamMembers?.join(', ') || '',
+        startDate: formData.startDate,
+        startTime: formData.startTime,
+        endTime: anytime ? '' : (formData.endTime || ''),
+        anytime,
+      }
+      if (editingTask) {
+        onTaskUpdated?.(editingTask.id, taskData)
+      } else {
+        onTaskCreated?.(taskData)
+      }
+    } else {
+      alert('Workorder created successfully! (Static UI)')
+    }
     onClose()
-    // Reset form
     setFormData({
       client: '',
       address: '',
@@ -484,13 +578,15 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               <span className="text-base font-semibold text-neutral-dark">New Quote</span>
             ) : invoiceOnly ? (
               <span className="text-base font-semibold text-neutral-dark">New Invoice</span>
+            ) : taskOnly ? (
+              <span className="text-base font-semibold text-neutral-dark">{editingTask ? 'Edit Task' : 'New Task'}</span>
             ) : (
               <>
             <button
               onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
               className="flex items-center gap-1.5 text-base font-semibold text-neutral-dark hover:text-neutral-dark/80 transition-colors"
             >
-              <span>{taskType === 'task' ? 'New Task' : 'New Workorder'}</span>
+              <span>{effectiveTaskType === 'task' ? 'New Task' : 'New Workorder'}</span>
               <FiChevronDown size={12} className={`text-neutral-dark/70 transition-transform ${isTypeDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             
@@ -752,8 +848,8 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               </div>
             )}
 
-            {/* Line Items - for Workorder or Quote/Invoice-only */}
-            {(taskType === 'workorder' || documentOnly) && (
+            {/* Line Items - for Workorder or Quote/Invoice-only (hidden for Task) */}
+            {(effectiveTaskType === 'workorder' || documentOnly) && (
               <div ref={lineItemsSectionRef} className="space-y-3">
                 {/* + Add Line Item - always in same place; opens dropdown to select existing items only */}
                 <div ref={addLineItemDropdownRef} className="relative">
@@ -959,20 +1055,39 @@ export default function AddWorkorderModal({ isOpen, onClose, initialDate, initia
               {!documentOnly && (
               <button
                 type="button"
+                onClick={onClose}
+                className="px-2.5 py-1 bg-white border border-neutral-light rounded text-neutral-dark hover:bg-neutral-light transition-colors text-xs font-medium"
+              >
+                Cancel
+              </button>
+              )}
+              {effectiveTaskType === 'task' && editingTask && onConvertToWorkorder && (
+              <button
+                type="button"
                 onClick={() => {
+                  onConvertToWorkorder({
+                    title: formData.title || 'Untitled Task',
+                    clientName: formData.client || '',
+                    address: formData.address || '',
+                    instructions: formData.instructions || '',
+                    assignedTo: formData.assignedTeamMembers?.join(', ') || '',
+                    startDate: formData.startDate,
+                    startTime: formData.startTime,
+                    endTime: anytime ? '' : (formData.endTime || ''),
+                    anytime,
+                  })
                   onClose()
-                  router.push('/workorders/new')
                 }}
                 className="px-2.5 py-1 bg-white border border-neutral-light rounded text-neutral-dark hover:bg-neutral-light transition-colors text-xs font-medium"
               >
-                More Options
+                Convert to Workorder
               </button>
               )}
               <button
                 type="submit"
                 className="px-2.5 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-xs font-medium"
               >
-                {quoteOnly ? 'Save Quote' : invoiceOnly ? 'Save Invoice' : 'Save'}
+                {quoteOnly ? 'Save Quote' : invoiceOnly ? 'Save Invoice' : effectiveTaskType === 'task' ? 'Save' : 'Save'}
               </button>
             </div>
           </form>

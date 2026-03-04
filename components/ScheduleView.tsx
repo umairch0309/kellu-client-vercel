@@ -55,7 +55,7 @@ export default function ScheduleView() {
   // Editable work orders for drag/resize (initialized from mock)
   const [workOrders, setWorkOrders] = useState<ScheduleItem[]>(() => JSON.parse(JSON.stringify(mockWorkorders)))
   const updateWorkOrder = (id: number, updates: Partial<ScheduleItem>) => {
-    setWorkOrders(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w))
+    setWorkOrders(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w) as ScheduleItem[])
   }
 
   // Resize state: which item and which edge (for duration change)
@@ -126,7 +126,7 @@ export default function ScheduleView() {
     let matchesTeam = true
     if (selectedTeams.size > 0) {
       matchesTeam = (selectedTeams.has('unassigned') && (!item.assignedTeamMember || item.assignedTeamMember === '')) ||
-        (item.assignedTeamMember && selectedTeams.has(item.assignedTeamMember))
+        !!(item.assignedTeamMember && selectedTeams.has(item.assignedTeamMember))
     }
     return matchesType && matchesTeam
   })
@@ -381,11 +381,12 @@ export default function ScheduleView() {
     if (!selectedItem) return
     updateWorkOrder(selectedItem.id, { assignedTeamMember: '' })
   }
+  const activeTeamMembers = mockTeamMembers.filter((m) => m.active)
   const eventDetailAssignSelectAll = () => {
     if (!selectedItem) return
-    updateWorkOrder(selectedItem.id, { assignedTeamMember: mockTeamMembers.map(m => m.name).join(', ') })
+    updateWorkOrder(selectedItem.id, { assignedTeamMember: activeTeamMembers.map(m => m.name).join(', ') })
   }
-  const filteredEventDetailTeam = mockTeamMembers.filter(m => m.name.toLowerCase().includes(eventDetailAssignSearchTerm.toLowerCase()))
+  const filteredEventDetailTeam = activeTeamMembers.filter(m => m.name.toLowerCase().includes(eventDetailAssignSearchTerm.toLowerCase()))
 
   const eventDetailModal = selectedItem && typeof document !== 'undefined' && createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true">
@@ -524,11 +525,11 @@ export default function ScheduleView() {
                   <span className="text-xs font-medium" style={{ color: '#1F271B' }}>{eventDetailAssignedList.length} selected</span>
                   <button
                     type="button"
-                    onClick={() => eventDetailAssignedList.length === mockTeamMembers.length ? eventDetailAssignClear() : eventDetailAssignSelectAll()}
+                    onClick={() => eventDetailAssignedList.length === activeTeamMembers.length ? eventDetailAssignClear() : eventDetailAssignSelectAll()}
                     className="text-xs font-medium underline"
                     style={{ color: '#28AFB0' }}
                   >
-                    {eventDetailAssignedList.length === mockTeamMembers.length ? 'Clear' : 'Select all'}
+                    {eventDetailAssignedList.length === activeTeamMembers.length ? 'Clear' : 'Select all'}
                   </button>
                 </div>
                 <div className="max-h-40 overflow-y-auto">

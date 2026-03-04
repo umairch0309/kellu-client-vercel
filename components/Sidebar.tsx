@@ -15,7 +15,8 @@ import {
   FiChevronDown,
   FiTool,
   FiEdit,
-  FiCreditCard
+  FiCreditCard,
+  FiTrendingUp
 } from 'react-icons/fi'
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ const menuItems = [
   { icon: FiTool, label: 'Workorder', href: '/workorders', hasDropdown: false },
   { icon: FiEdit, label: 'Quotes', href: '/quotes', hasDropdown: false },
   { icon: FiFileText, label: 'Invoices', href: '/invoices', hasDropdown: false },
+  { icon: FiTrendingUp, label: 'Insights', href: '/insights', hasDropdown: false },
   { icon: FiCheckSquare, label: 'Tasks', href: '/tasks', hasDropdown: false },
   { icon: FiCreditCard, label: 'Expenses', href: '/expenses', hasDropdown: false },
 ]
@@ -125,7 +127,8 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
               const Icon = item.icon
               const isActive = pathname === item.href || 
                 (item.href === '/clients' && pathname.startsWith('/clients')) ||
-                (item.href === '/workorders' && pathname.startsWith('/workorders'))
+                (item.href === '/workorders' && pathname.startsWith('/workorders')) ||
+                (item.href === '/insights' && pathname.startsWith('/insights'))
               return (
                 <li key={item.href}>
                   <Link

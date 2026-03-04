@@ -422,7 +422,18 @@ export const mockWorkorders = [
   },
 ]
 
-export const mockTeamMembers = [
+export type MockTeamMember = {
+  id: number
+  name: string
+  email: string
+  phone: string
+  rut: string
+  role: string
+  picture: string
+  active: boolean
+}
+
+export const mockTeamMembers: MockTeamMember[] = [
   {
     id: 1,
     name: 'Tom Wilson',
@@ -431,6 +442,7 @@ export const mockTeamMembers = [
     rut: '12345678-9',
     role: 'Technician',
     picture: '',
+    active: true,
   },
   {
     id: 2,
@@ -440,6 +452,7 @@ export const mockTeamMembers = [
     rut: '12345679-0',
     role: 'Technician',
     picture: '',
+    active: true,
   },
   {
     id: 3,
@@ -449,6 +462,7 @@ export const mockTeamMembers = [
     rut: '12345680-1',
     role: 'Technician',
     picture: '',
+    active: true,
   },
 ]
 

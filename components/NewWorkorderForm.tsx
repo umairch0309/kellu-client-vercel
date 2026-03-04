@@ -152,7 +152,7 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
   // Assign options: Business owner + team members (no Unavailable - same as Filter)
   const assignOptions = [
     { value: 'Business owner', label: 'Business owner' },
-    ...mockTeamMembers.map(m => ({ value: m.name, label: m.name })),
+    ...mockTeamMembers.filter((m) => m.active).map(m => ({ value: m.name, label: m.name })),
   ]
   const filteredAssignOptions = assignOptions.filter(opt =>
     opt.label.toLowerCase().includes(assignSearchTerm.toLowerCase())

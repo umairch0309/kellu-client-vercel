@@ -1,18 +1,35 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { FiPlus, FiSearch } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { mockExpenses, mockWorkorders, mockClients } from '@/data/mockData'
+import ExpenseModal, { type ExpenseFormData } from './ExpenseModal'
+
+type ExpenseRecord = typeof mockExpenses[0]
 
 export default function ExpensesList() {
-  const router = useRouter()
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => [...mockExpenses])
   const [searchTerm, setSearchTerm] = useState('')
   const [startDateFilter, setStartDateFilter] = useState('')
   const [endDateFilter, setEndDateFilter] = useState('')
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null)
 
-  const filteredExpenses = mockExpenses.filter(expense => {
+  const openNewExpense = () => {
+    setEditingExpense(null)
+    setIsExpenseModalOpen(true)
+  }
+  const openEditExpense = (expense: ExpenseRecord) => {
+    setEditingExpense(expense)
+    setIsExpenseModalOpen(true)
+  }
+  const closeExpenseModal = () => {
+    setIsExpenseModalOpen(false)
+    setEditingExpense(null)
+  }
+
+  const filteredExpenses = expenses.filter(expense => {
     const term = searchTerm.toLowerCase().trim()
       const workorder = expense.linkedWorkorder ? mockWorkorders.find(wo => wo.id === expense.linkedWorkorder) : null
     const client = workorder ? mockClients.find(c => c.id === workorder.clientId) : null
@@ -30,12 +47,36 @@ export default function ExpensesList() {
     return matchesSearch && matchesDateRange
   })
 
-  const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.total, 0)
-
-  const handleRowClick = (expense: typeof mockExpenses[0]) => {
-    if (expense.linkedWorkorder) {
-      router.push(`/workorders/${expense.linkedWorkorder}`)
+  const handleSaveExpense = (data: ExpenseFormData) => {
+    if (editingExpense) {
+      const updated = {
+        ...editingExpense,
+        date: data.date,
+        itemName: data.itemName,
+        details: data.details,
+        total: data.total,
+        linkedWorkorder: data.linkedWorkorder,
+        invoiceNumber: data.invoiceNumber,
+      }
+      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? updated : e))
+      const idx = mockExpenses.findIndex(e => e.id === editingExpense.id)
+      if (idx >= 0) Object.assign(mockExpenses[idx], updated)
+    } else {
+      const newId = expenses.length > 0 ? Math.max(...expenses.map(e => e.id)) + 1 : 1
+      const newExpense: ExpenseRecord = {
+        id: newId,
+        date: data.date,
+        itemName: data.itemName,
+        details: data.details,
+        total: data.total,
+        linkedWorkorder: data.linkedWorkorder,
+        invoiceNumber: data.invoiceNumber,
+        attachment: '',
+      }
+      setExpenses(prev => [...prev, newExpense])
+      mockExpenses.push(newExpense)
     }
+    closeExpenseModal()
   }
 
   return (
@@ -44,7 +85,7 @@ export default function ExpensesList() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#1F271B' }}>Expenses</h1>
         <button
-          onClick={() => router.push('/expenses/new')}
+          onClick={openNewExpense}
           className="px-3 py-1.5 rounded text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
           style={{ backgroundColor: '#28AFB0' }}
           onMouseEnter={(e) => {
@@ -111,9 +152,9 @@ export default function ExpensesList() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
-                  <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>DATE</th>
-                  <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>ITEM NAME</th>
+                  <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>NAME</th>
                   <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>DETAILS</th>
+                  <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>DATE</th>
                   <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>LINKED WORKORDER</th>
                   <th className="text-right py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>TOTAL</th>
                 </tr>
@@ -125,18 +166,18 @@ export default function ExpensesList() {
                   return (
                     <tr
                       key={expense.id}
-                      onClick={() => handleRowClick(expense)}
-                      className={`border-b transition-colors ${expense.linkedWorkorder ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                      onClick={() => openEditExpense(expense)}
+                      className="border-b transition-colors cursor-pointer hover:bg-gray-50"
                       style={{ borderBottomColor: '#EAEBED' }}
                     >
-                      <td className="py-2 px-2 text-xs" style={{ color: '#1F271B' }}>
-                        {format(new Date(expense.date), 'MMM dd, yyyy')}
-                      </td>
                       <td className="py-2 px-2">
                         <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{expense.itemName}</p>
                       </td>
                       <td className="py-2 px-2 text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
                         {expense.details || '—'}
+                      </td>
+                      <td className="py-2 px-2 text-xs" style={{ color: '#1F271B' }}>
+                        {format(new Date(expense.date), 'MMM dd, yyyy')}
                       </td>
                       <td className="py-2 px-2">
                         {expense.linkedWorkorder ? (
@@ -163,18 +204,6 @@ export default function ExpensesList() {
                   )
                 })}
               </tbody>
-              <tfoot>
-                <tr className="border-t font-semibold" style={{ borderTopColor: '#EAEBED' }}>
-                  <td colSpan={4} className="py-2 px-2 text-xs text-right" style={{ color: '#1F271B' }}>
-                    Total:
-                  </td>
-                  <td className="py-2 px-2 text-right">
-                    <span className="text-xs font-bold" style={{ color: '#1F271B' }}>
-                      Rs{totalExpenses.toFixed(2)}
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         ) : (
@@ -185,6 +214,13 @@ export default function ExpensesList() {
           </div>
         )}
       </div>
+
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={closeExpenseModal}
+        expense={editingExpense}
+        onSave={handleSaveExpense}
+      />
     </div>
   )
 }

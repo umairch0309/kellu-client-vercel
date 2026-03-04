@@ -33,14 +33,13 @@ export default function NewTaskModal({ isOpen, onClose, onSave }: NewTaskModalPr
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('10:00')
   const [anytime, setAnytime] = useState(true)
-  const [showMoreOptions, setShowMoreOptions] = useState(false)
   const clientDropdownRef = useRef<HTMLDivElement>(null)
   const assignRef = useRef<HTMLDivElement>(null)
 
   // Assign options: Business owner + team members (no Unavailable - same as Filter)
   const assignOptions = [
     { value: 'Business owner', label: 'Business owner' },
-    ...mockTeamMembers.map(m => ({ value: m.name, label: m.name })),
+    ...mockTeamMembers.filter((m) => m.active).map(m => ({ value: m.name, label: m.name })),
   ]
   const filteredAssignOptions = assignOptions.filter(opt =>
     opt.label.toLowerCase().includes(assignSearchTerm.toLowerCase())
@@ -365,16 +364,16 @@ export default function NewTaskModal({ isOpen, onClose, onSave }: NewTaskModalPr
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 border-t shrink-0" style={{ borderColor: '#EAEBED' }}>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t shrink-0" style={{ borderColor: '#EAEBED' }}>
           <button
             type="button"
-            onClick={() => setShowMoreOptions(!showMoreOptions)}
+            onClick={onClose}
             className="px-4 py-2 border rounded text-sm font-medium"
             style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
           >
-            More Options
+            Cancel
           </button>
           <button
             type="button"

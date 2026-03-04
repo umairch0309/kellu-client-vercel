@@ -1,21 +1,19 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FiSave, FiUpload, FiMail, FiMessageCircle, FiSearch, FiX, FiPlus } from 'react-icons/fi'
-import { mockMasterPriceList, type MasterPriceItem, type MasterPriceItemType } from '@/data/mockData'
+import { FiSave, FiUpload, FiMail, FiMessageCircle, FiSearch, FiX, FiPlus, FiZap, FiSliders, FiMoreVertical, FiUserMinus, FiUserPlus } from 'react-icons/fi'
+import { mockMasterPriceList, mockTeamMembers, type MasterPriceItem, type MasterPriceItemType, type MockTeamMember } from '@/data/mockData'
 
-type SettingsSection = 'schedule' | 'products' | 'communications' | 'team' | 'roles' | 'templates' | 'reminders' | 'language'
+type SettingsSection = 'company' | 'schedule' | 'products' | 'communications' | 'team' | 'roles'
 
 const SIDEBAR_ITEMS: { id: SettingsSection; label: string }[] = [
+  { id: 'company', label: 'Company Settings' },
   { id: 'schedule', label: 'Schedule Settings' },
   { id: 'products', label: 'Product and Services' },
-  { id: 'communications', label: 'Communications settings' },
+  { id: 'communications', label: 'Communications Settings' },
   { id: 'team', label: 'Team Management' },
   { id: 'roles', label: 'Roles & Permissions' },
-  { id: 'templates', label: 'Templates' },
-  { id: 'reminders', label: 'Reminders' },
-  { id: 'language', label: 'Language' },
 ]
 
 export type RoleDef = { id: string; name: string; description: string; permissions: string[]; isSystem: boolean }
@@ -43,7 +41,7 @@ const inputClass = 'w-full px-3 py-2 border rounded text-sm focus:outline-none f
 const labelClass = 'block text-sm font-medium mb-1'
 const sectionTitleClass = 'text-base font-semibold mb-3'
 
-const VALID_SECTIONS: SettingsSection[] = ['schedule', 'products', 'communications', 'team', 'roles', 'templates', 'reminders', 'language']
+const VALID_SECTIONS: SettingsSection[] = ['company', 'schedule', 'products', 'communications', 'team', 'roles']
 
 const LOCALE_STORAGE_KEY = 'appLocale'
 export type AppLocale = 'en' | 'es'
@@ -57,7 +55,7 @@ export function getStoredLocale(): AppLocale {
 export default function SettingsView() {
   const searchParams = useSearchParams()
   const sectionFromUrl = searchParams.get('section') as SettingsSection | null
-  const [activeSection, setActiveSection] = useState<SettingsSection>('schedule')
+  const [activeSection, setActiveSection] = useState<SettingsSection>('company')
   const [roles, setRoles] = useState<RoleDef[]>(() => [...INITIAL_ROLES])
 
   useEffect(() => {
@@ -94,14 +92,12 @@ export default function SettingsView() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0 overflow-y-auto">
+        {activeSection === 'company' && <CompanySettings />}
         {activeSection === 'schedule' && <ScheduleSettings />}
         {activeSection === 'products' && <ServicesSettings />}
         {activeSection === 'communications' && <CommunicationsSettings />}
-        {activeSection === 'team' && <TeamSettings roleOptions={roles.map((r) => r.name)} />}
+        {activeSection === 'team' && <TeamSettings roleOptions={roles.filter((r) => r.id !== 'super-admin').map((r) => r.name)} />}
         {activeSection === 'roles' && <RolesPermissionsSettings roles={roles} setRoles={setRoles} />}
-        {activeSection === 'templates' && <EmailTemplates />}
-        {activeSection === 'reminders' && <RemindersSettings />}
-        {activeSection === 'language' && <LanguageSettings />}
       </main>
     </div>
   )
@@ -158,62 +154,244 @@ function LanguageSettings() {
   )
 }
 
-const DEFAULT_BLOCK_COLORS = [
-  { id: 'job', label: 'Job', color: '#28AFB0' },
-  { id: 'quote', label: 'Quote / Budget', color: '#2B50AA' },
-  { id: 'unassigned', label: 'Unassigned', color: '#9CA3AF' },
-  { id: 'blocked', label: 'Blocked / Time off', color: '#6B7280' },
-  { id: 'in progress', label: 'In progress', color: '#7C3AED' },
+const CALENDAR_COLOR_PALETTE = [
+  '#DC2626', '#EA580C', '#F97316', '#78716C', '#D6D3D1',
+  '#FACC15', '#2563EB', '#3B82F6', '#60A5FA', '#22D3EE',
+  '#15803D', '#22C55E', '#4ADE80', '#7C3AED', '#C026D3',
+  '#EC4899', '#1F271B', '#6B7280', '#9CA3AF',
+]
+
+type CalendarColorAssignment = { id: string; color: string; assignedTo: string }
+
+const DEFAULT_CALENDAR_ASSIGNMENTS: CalendarColorAssignment[] = [
+  { id: '1', color: '#3B82F6', assignedTo: 'Tom Wilson' },
 ]
 
 function ScheduleSettings() {
-  const [blocks, setBlocks] = useState(DEFAULT_BLOCK_COLORS)
+  const [assignments, setAssignments] = useState<CalendarColorAssignment[]>(() => [...DEFAULT_CALENDAR_ASSIGNMENTS])
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
+  const [assignColor, setAssignColor] = useState(CALENDAR_COLOR_PALETTE[2])
+  const [assignPerson, setAssignPerson] = useState('')
+
+  const teamMemberOptions = mockTeamMembers.filter((m) => m.active).map((m) => ({ value: m.name, label: m.name }))
+
+  const handleSaveAssignment = () => {
+    if (!assignPerson.trim()) return
+    setAssignments((prev) => {
+      const existing = prev.find((a) => a.assignedTo === assignPerson.trim())
+      const next = existing
+        ? prev.map((a) => (a.assignedTo === assignPerson.trim() ? { ...a, color: assignColor } : a))
+        : [...prev, { id: String(Date.now()), color: assignColor, assignedTo: assignPerson.trim() }]
+      return next
+    })
+    setAssignModalOpen(false)
+    setAssignPerson('')
+  }
+
   return (
     <div className="space-y-6 pb-8">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Schedule Settings</h1>
-      <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
-        Set colors for blocks shown on the schedule. These colors help distinguish job status, quotes, unassigned time, and blocked time.
-      </p>
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Block colors</h2>
-        <div className="space-y-4 max-w-md">
-          {blocks.map((b) => (
-            <div key={b.id} className="flex items-center gap-4">
-              <label className="w-32 text-sm font-medium shrink-0" style={{ color: '#1F271B' }}>{b.label}</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={b.color}
-                  onChange={(e) => setBlocks((prev) => prev.map((x) => (x.id === b.id ? { ...x, color: e.target.value } : x)))}
-                  className="w-10 h-10 rounded border cursor-pointer"
-                  style={{ borderColor: '#EAEBED', padding: 2 }}
-                />
-                <input
-                  type="text"
-                  value={b.color}
-                  onChange={(e) => setBlocks((prev) => prev.map((x) => (x.id === b.id ? { ...x, color: e.target.value } : x)))}
-                  className="w-24 px-2 py-1.5 border rounded text-sm font-mono"
-                  style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs mt-4" style={{ color: '#1F271B', opacity: 0.6 }}>
-          Colors apply to the calendar/schedule view. Use hex codes (e.g. #28AFB0) for consistency.
-        </p>
-      </section>
-      <div className="flex justify-end">
-        <button type="button" className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
-          <FiSave size={18} />
-          Save changes
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Calendar colors</h1>
+        <button
+          type="button"
+          onClick={() => setAssignModalOpen(true)}
+          className="px-4 py-2 rounded text-sm font-medium flex items-center gap-2 text-white shrink-0"
+          style={{ backgroundColor: '#28AFB0' }}
+        >
+          Assign a Color
         </button>
       </div>
+      <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
+        Assign colors to team members. Calendar blocks will use the color of the assigned person. If multiple colors apply to an item, the last applicable color will be used.
+      </p>
+
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <div className="space-y-3">
+          {assignments.length === 0 ? (
+            <p className="text-sm py-4" style={{ color: '#1F271B', opacity: 0.6 }}>No color assignments yet. Click &quot;Assign a Color&quot; to add one.</p>
+          ) : (
+            assignments.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center gap-3 py-2 px-3 rounded-lg border"
+                style={{ borderColor: '#EAEBED', backgroundColor: '#FAFAFA' }}
+              >
+                <FiSliders size={16} style={{ color: '#1F271B', opacity: 0.6 }} className="shrink-0" />
+                <div
+                  className="w-5 h-5 rounded shrink-0 border"
+                  style={{ backgroundColor: a.color, borderColor: '#EAEBED' }}
+                />
+                <span className="text-sm font-medium" style={{ color: '#28AFB0' }}>
+                  Assigned to {a.assignedTo}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {assignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" style={{ borderColor: '#EAEBED', border: '1px solid #EAEBED' }}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold" style={{ color: '#1F271B' }}>Assign a color</h3>
+              <button
+                type="button"
+                onClick={() => { setAssignModalOpen(false); setAssignPerson('') }}
+                className="p-1.5 rounded hover:bg-gray-100"
+                style={{ color: '#1F271B' }}
+                aria-label="Close"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-5">
+              <label className={labelClass} style={{ color: '#1F271B' }}>Choose a color</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CALENDAR_COLOR_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setAssignColor(c)}
+                    className="w-8 h-8 rounded border-2 shrink-0 flex items-center justify-center transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: c,
+                      borderColor: assignColor === c ? '#1F271B' : '#EAEBED',
+                      boxShadow: assignColor === c ? 'inset 0 0 0 1px rgba(0,0,0,0.2)' : 'none',
+                    }}
+                    aria-label={`Color ${c}`}
+                  >
+                    {assignColor === c && <FiX size={14} className="text-white drop-shadow" strokeWidth={3} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className={labelClass} style={{ color: '#1F271B' }}>Apply color</label>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                <div className="flex-1">
+                  <span className="text-xs block mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>when assigned to</span>
+                  <select
+                    value={assignPerson}
+                    onChange={(e) => setAssignPerson(e.target.value)}
+                    className={inputClass}
+                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                  >
+                    <option value="">Select team member</option>
+                    {teamMemberOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 sm:min-w-[140px]">
+                  <span className="text-xs block mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>team member</span>
+                  <select
+                    value={assignPerson}
+                    onChange={(e) => setAssignPerson(e.target.value)}
+                    className={inputClass}
+                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                  >
+                    <option value="">—</option>
+                    {teamMemberOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg p-3 mb-5" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
+              <p className="text-xs" style={{ opacity: 0.85 }}>
+                If multiple colors apply to an item, the last applicable color will be used.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setAssignModalOpen(false); setAssignPerson('') }}
+                className="px-4 py-2 border rounded text-sm font-medium"
+                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAssignment}
+                className="px-4 py-2 rounded text-sm font-medium text-white"
+                style={{ backgroundColor: '#28AFB0' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 const SEND_WHATSAPP_DEFAULT_KEY = 'kellu_send_whatsapp_default'
+
+const VARIABLE_SECTIONS: { section: string; variables: { value: string; label: string }[] }[] = [
+  { section: 'General', variables: [{ value: '{current_date}', label: 'Current date' }] },
+  {
+    section: 'Client',
+    variables: [
+      { value: '{client_name}', label: 'Name' },
+      { value: '{company_info}', label: 'Company info: "Your Company"' },
+      { value: '{company_name}', label: 'Company Name' },
+      { value: '{contact_email}', label: 'Contact Email' },
+      { value: '{phone_number}', label: 'Phone Number' },
+      { value: '{line_items}', label: 'Line items' },
+      { value: '{discount_amount}', label: 'Discount amount' },
+      { value: '{total}', label: 'Total' },
+      { value: '{payment_amount}', label: 'Payment amount (total amount paid)' },
+      { value: '{total_after_payments}', label: 'Total after payments' },
+      { value: '{balance}', label: 'Balance' },
+    ],
+  },
+  { section: 'Quote', variables: [{ value: '{quote_number}', label: 'Quote #' }, { value: '{quote_sent_date}', label: 'Sent date' }] },
+  {
+    section: 'Job',
+    variables: [
+      { value: '{workorder_number}', label: 'Workorder #' },
+      { value: '{arrival_window}', label: 'Arrival window' },
+      { value: '{job_date}', label: 'Job Date' },
+      { value: '{job_date_time}', label: 'Job Date and Time' },
+      { value: '{job_details}', label: 'Job Details' },
+      { value: '{job_address}', label: 'Job Address' },
+      { value: '{job_title}', label: 'Job Title' },
+    ],
+  },
+  { section: 'Invoice', variables: [{ value: '{invoice_number}', label: 'Invoice #' }, { value: '{invoice_sent_date}', label: 'Sent date' }, { value: '{due_date}', label: 'Due date' }] },
+  { section: 'Your Branding', variables: [{ value: '{brand_company_name}', label: 'Company Name' }, { value: '{brand_contact_email}', label: 'Contact Email' }, { value: '{brand_phone_number}', label: 'Phone Number' }] },
+]
+
+type ReminderKind = 'booking' | 'quote' | 'invoice'
+type CommunicationMessage = {
+  id: string
+  name: string
+  explanation: string
+  isReminder: boolean
+  reminderKind?: ReminderKind
+  reminderSummary?: string[]
+}
+const COMMUNICATION_MESSAGES: CommunicationMessage[] = [
+  { id: 'booking-confirmation', name: 'Booking confirmation', explanation: 'Notifies a client that an assessment has been scheduled when sent.', isReminder: false },
+  { id: 'booking-confirmation-reminders', name: 'Booking confirmation Reminders', explanation: 'Automatically notifies a client about an upcoming assessment for a request.', isReminder: true, reminderKind: 'booking', reminderSummary: ['Send a reminder 1 hour before the appointment by email', 'Send a reminder 1 day before the appointment by email at 2:30 PM'] },
+  { id: 'send-quote', name: 'Send Quote Message', explanation: 'Notifies a client about a new quote when sent.', isReminder: false },
+  { id: 'quote-reminders', name: 'Quote reminders', explanation: 'Reminder to follow up on a sent quote.', isReminder: true, reminderKind: 'quote', reminderSummary: ['Send 48 hours after quote sent by email', 'Send 5 days after quote sent by email'] },
+  { id: 'send-invoice', name: 'Send Invoice Message', explanation: 'Notifies a client about a new invoice when sent.', isReminder: false },
+  { id: 'invoice-reminders', name: 'Invoice Reminders', explanation: 'Reminder when invoice is due or overdue.', isReminder: true, reminderKind: 'invoice', reminderSummary: ['Send on day due by email', 'Send 2 days after due by email'] },
+  { id: 'send-job-report', name: 'Send job Report', explanation: 'Report sent after job completion with notes and details.', isReminder: false },
+  { id: 'send-job-follow-up', name: 'Send Job - follow up', explanation: 'Automatically notifies a client about an upcoming job or follow-up.', isReminder: true, reminderKind: 'booking', reminderSummary: ['Send a reminder 1 hour before the appointment by email', 'Send a reminder 1 day before the appointment by email at 2:30 PM'] },
+  { id: 'payment-receipt', name: 'Payment receipt', explanation: 'Sent to the client when a payment is received.', isReminder: false },
+  { id: 'send-maintenance-follow-up', name: 'Send Maintenance follow-up', explanation: 'Reminder for scheduled maintenance or follow-up with the client.', isReminder: true, reminderKind: 'booking', reminderSummary: ['Send 1 day before by email', 'Send on the day by email at 9:00 AM'] },
+  { id: 'send-offer', name: 'Send Offer', explanation: 'Promotional or service offer sent to the client.', isReminder: true, reminderKind: 'booking', reminderSummary: ['Send by email when offer is created', 'Send reminder 3 days after by email'] },
+]
 
 function CommunicationsSettings() {
   const [sendWhatsAppByDefault, setSendWhatsAppByDefault] = useState(() => {
@@ -221,17 +399,23 @@ function CommunicationsSettings() {
     const v = localStorage.getItem(SEND_WHATSAPP_DEFAULT_KEY)
     return v === null ? true : v === 'true'
   })
+  const [reminderEnabled, setReminderEnabled] = useState<Record<string, boolean>>(() =>
+    COMMUNICATION_MESSAGES.filter((m) => m.isReminder).reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
+  )
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
 
   const handleSave = () => {
     localStorage.setItem(SEND_WHATSAPP_DEFAULT_KEY, String(sendWhatsAppByDefault))
   }
+  const toggleReminder = (id: string) => setReminderEnabled((prev) => ({ ...prev, [id]: !prev[id] }))
 
   return (
     <div className="space-y-6 pb-8">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Communications settings</h1>
+      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Communications Settings</h1>
       <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
-        Opt in or out of reminders by type. When a reminder type is disabled, no reminders of that type will be sent.
+        Manage message templates and reminders in one place. Edit each template and turn reminders on or off.
       </p>
+
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Email & WhatsApp</h2>
         <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>
@@ -248,75 +432,594 @@ function CommunicationsSettings() {
           />
         </label>
       </section>
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Reminders by type</h2>
-        <div className="space-y-3">
-          <label className="flex items-center justify-between gap-4 cursor-pointer py-2 border-b" style={{ borderColor: '#EAEBED' }}>
-            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Budget (Quote) reminders</span>
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          </label>
-          <label className="flex items-center justify-between gap-4 cursor-pointer py-2 border-b" style={{ borderColor: '#EAEBED' }}>
-            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Booking confirmation reminder</span>
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          </label>
-          <label className="flex items-center justify-between gap-4 cursor-pointer py-2 border-b" style={{ borderColor: '#EAEBED' }}>
-            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Invoice reminders</span>
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          </label>
-          <label className="flex items-center justify-between gap-4 cursor-pointer py-2" style={{ borderColor: '#EAEBED' }}>
-            <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Customer reminders (maintenance / offers)</span>
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          </label>
+
+      <section className="bg-white rounded-lg border p-5" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Messages</h2>
+        <div className="divide-y -mx-1" style={{ borderColor: '#EAEBED' }}>
+          {COMMUNICATION_MESSAGES.map((msg) => (
+            <div
+              key={msg.id}
+              className="py-4 px-1 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="text-base font-semibold" style={{ color: '#1F271B' }}>{msg.name}</h3>
+                  {msg.isReminder && (
+                    <label className="flex items-center gap-2 cursor-pointer shrink-0">
+                      <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>Reminder</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={reminderEnabled[msg.id] ?? true}
+                        onClick={() => toggleReminder(msg.id)}
+                        className="relative w-10 h-6 rounded-full transition-colors"
+                        style={{ backgroundColor: reminderEnabled[msg.id] !== false ? '#28AFB0' : '#D1D5DB' }}
+                      >
+                        <span
+                          className="absolute w-4 h-4 rounded-full bg-white shadow transition-transform"
+                          style={{ left: reminderEnabled[msg.id] !== false ? '22px' : '4px', top: '4px' }}
+                        />
+                      </button>
+                    </label>
+                  )}
+                </div>
+                <p className="text-sm mt-0.5" style={{ color: '#1F271B', opacity: 0.75 }}>{msg.explanation}</p>
+                {msg.isReminder && msg.reminderSummary && msg.reminderSummary.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>
+                    {msg.reminderSummary.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEditingTemplateId(msg.id)}
+                  className="text-sm font-medium underline hover:no-underline"
+                  style={{ color: '#28AFB0' }}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
+
       <div className="flex justify-end">
         <button type="button" onClick={handleSave} className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
           <FiSave size={18} />
           Save changes
         </button>
       </div>
+
+      {editingTemplateId && (() => {
+        const msg = COMMUNICATION_MESSAGES.find((m) => m.id === editingTemplateId)
+        if (msg?.isReminder) {
+          return (
+            <ReminderEditModal
+              templateId={editingTemplateId}
+              templateName={msg.name}
+              reminderKind={msg.reminderKind ?? 'booking'}
+              onClose={() => setEditingTemplateId(null)}
+            />
+          )
+        }
+        return (
+          <TemplateEditModal
+            templateId={editingTemplateId}
+            templateName={msg?.name ?? editingTemplateId}
+            onClose={() => setEditingTemplateId(null)}
+          />
+        )
+      })()}
     </div>
   )
 }
 
+const PREVIEW_REPLACEMENTS: Record<string, string> = {
+  '{client_name}': 'Natasha',
+  '{current_date}': new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+  '{company_name}': 'Your Company',
+  '{company_info}': 'Your Company',
+  '{contact_email}': 'contact@company.com',
+  '{phone_number}': '+1 234-567-8900',
+  '{quote_number}': '#2345',
+  '{quote_sent_date}': 'Feb 5, 2026',
+  '{workorder_number}': '#WO-101',
+  '{job_date}': 'Feb 15, 2026',
+  '{job_title}': 'Plumbing repair',
+  '{invoice_number}': '#INV-789',
+  '{due_date}': 'Mar 1, 2026',
+  '{brand_company_name}': 'Ernies Plumbers Homeland',
+  '{brand_contact_email}': 'info@company.com',
+  '{brand_phone_number}': '+1 234-567-8900',
+}
+function previewText(text: string): string {
+  let out = text
+  Object.entries(PREVIEW_REPLACEMENTS).forEach(([key, val]) => {
+    out = out.split(key).join(val)
+  })
+  return out
+}
+
+function TemplateEditModal({ templateId, templateName, onClose }: { templateId: string; templateName: string; onClose: () => void }) {
+  const [notifyEmail, setNotifyEmail] = useState(true)
+  const [notifyWhatsApp, setNotifyWhatsApp] = useState(false)
+  const [activeTab, setActiveTab] = useState<'email' | 'whatsapp'>('email')
+  const [subject, setSubject] = useState(`Following up on quote {quote_number}`)
+  const [message, setMessage] = useState(`Hi {client_name},\n\nWe just wanted to send a quick note to see if you had a chance to look at the quote we sent recently? We're happy to answer any questions you might have.\n\nWe're excited to get to work, so if you'd like to proceed let us know and we can get started!\n\nThanks,`)
+  const [variableDropdownOpen, setVariableDropdownOpen] = useState(false)
+  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const insertVariable = (value: string) => {
+    const ta = messageRef.current
+    if (ta) {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const before = message.slice(0, start)
+      const after = message.slice(end)
+      setMessage(before + value + after)
+      setVariableDropdownOpen(false)
+      setTimeout(() => ta.focus(), 0)
+    }
+  }
+
+  const previewSubject = previewText(subject)
+  const previewBody = previewText(message) + '\n\n' + (PREVIEW_REPLACEMENTS['{brand_company_name}'] ?? 'Company Name')
+  const whatsappReadOnlyMessage = previewText(message)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED', border: '1px solid #EAEBED' }}>
+        <div className="flex justify-between items-center p-4 border-b shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <h3 className="text-lg font-semibold" style={{ color: '#1F271B' }}>Edit template: {templateName}</h3>
+          <button type="button" onClick={onClose} className="p-1.5 rounded hover:bg-gray-100" style={{ color: '#1F271B' }} aria-label="Close">
+            <FiX size={20} />
+          </button>
+        </div>
+
+        <div className="p-4 border-b" style={{ borderColor: '#EAEBED' }}>
+          <p className="text-sm font-medium mb-2" style={{ color: '#1F271B' }}>Notification method</p>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.checked)}
+                className="w-4 h-4 rounded"
+                style={{ accentColor: '#28AFB0' }}
+              />
+              <span className="text-sm" style={{ color: '#1F271B' }}>Email</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notifyWhatsApp}
+                onChange={(e) => setNotifyWhatsApp(e.target.checked)}
+                className="w-4 h-4 rounded"
+                style={{ accentColor: '#28AFB0' }}
+              />
+              <span className="text-sm" style={{ color: '#1F271B' }}>WhatsApp</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex border-b shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('email')}
+            className="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+            style={{
+              borderBottomColor: activeTab === 'email' ? '#28AFB0' : 'transparent',
+              color: activeTab === 'email' ? '#28AFB0' : '#1F271B',
+              opacity: activeTab === 'email' ? 1 : 0.7,
+            }}
+          >
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('whatsapp')}
+            className="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+            style={{
+              borderBottomColor: activeTab === 'whatsapp' ? '#28AFB0' : 'transparent',
+              color: activeTab === 'whatsapp' ? '#28AFB0' : '#1F271B',
+              opacity: activeTab === 'whatsapp' ? 1 : 0.7,
+            }}
+          >
+            WhatsApp
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {activeTab === 'email' && (
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass} style={{ color: '#1F271B' }}>Email subject</label>
+                  <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={{ color: '#1F271B' }}>Message</label>
+                  <textarea
+                    ref={messageRef}
+                    rows={10}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    className={inputClass}
+                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+                  />
+                </div>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <button type="button" className="text-sm font-medium" style={{ color: '#DC2626' }}>Reset</button>
+                  <div className="relative">
+                    <span className="text-xs mr-2" style={{ color: '#1F271B', opacity: 0.7 }}>Insert variable:</span>
+                    <button
+                      type="button"
+                      onClick={() => setVariableDropdownOpen((o) => !o)}
+                      className="text-sm font-medium"
+                      style={{ color: '#28AFB0' }}
+                    >
+                      Insert variable
+                    </button>
+                    {variableDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" aria-hidden onClick={() => setVariableDropdownOpen(false)} />
+                        <div
+                          className="absolute left-0 top-full mt-1 py-2 rounded-lg border shadow-lg bg-white z-20 max-h-64 overflow-y-auto min-w-[220px]"
+                          style={{ borderColor: '#EAEBED' }}
+                        >
+                          <p className="px-3 pb-1 text-xs font-medium" style={{ color: '#1F271B', opacity: 0.6 }}>Example:</p>
+                          {VARIABLE_SECTIONS.map(({ section, variables }) => (
+                            <div key={section}>
+                              <p className="px-3 py-1 text-xs font-medium sticky top-0 bg-gray-50" style={{ color: '#6B7280' }}>{section}</p>
+                              {variables.map((v) => (
+                                <button key={v.value} type="button" onClick={() => insertVariable(v.value)} className="w-full px-3 py-1.5 text-left text-sm font-medium hover:bg-gray-100 block" style={{ color: '#1F271B' }}>{v.label}</button>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg p-4 min-h-[200px]" style={{ backgroundColor: '#F5F0E6' }}>
+                <p className="text-xs font-medium mb-2" style={{ color: '#1F271B', opacity: 0.7 }}>Preview</p>
+                <div className="text-sm whitespace-pre-wrap" style={{ color: '#1F271B' }}>
+                  <p className="font-medium mb-2">{previewSubject}</p>
+                  <p className="whitespace-pre-wrap">{previewBody}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'whatsapp' && (
+            <div className="p-4">
+              <p className="text-sm mb-2" style={{ color: '#1F271B', opacity: 0.8 }}>This is the message sent to your customers via WhatsApp. Editing is not available yet.</p>
+              <div className="rounded-lg border p-4 bg-gray-50" style={{ borderColor: '#EAEBED' }}>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: '#1F271B' }}>{whatsappReadOnlyMessage}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t flex justify-end gap-2 shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <button type="button" onClick={onClose} className="px-4 py-2 border rounded text-sm font-medium" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>Cancel</button>
+          <button type="button" className="px-4 py-2 rounded text-sm font-medium text-white" style={{ backgroundColor: '#28AFB0' }}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type BookingScheduleRow = { time: number; type: 'hours before' | 'days before'; timeOfDay: string; email: boolean; whatsapp: boolean }
+type QuoteInvoiceScheduleRow = { timeOfReminder: string; days: number; email: boolean; whatsapp: boolean }
+
+function ReminderEditModal({ templateId, templateName, reminderKind, onClose }: { templateId: string; templateName: string; reminderKind: ReminderKind; onClose: () => void }) {
+  const isBooking = reminderKind === 'booking'
+  const [bookingSchedules, setBookingSchedules] = useState<BookingScheduleRow[]>([
+    { time: 1, type: 'hours before', timeOfDay: '14:30', email: true, whatsapp: false },
+    { time: 1, type: 'days before', timeOfDay: '14:30', email: true, whatsapp: false },
+  ])
+  const [quoteInvoiceSchedules, setQuoteInvoiceSchedules] = useState<QuoteInvoiceScheduleRow[]>([
+    { timeOfReminder: '08:00', days: 0, email: true, whatsapp: false },
+    { timeOfReminder: 'AnyTime', days: 2, email: true, whatsapp: false },
+  ])
+  const [activeTab, setActiveTab] = useState<'email' | 'whatsapp'>('email')
+  const [subject, setSubject] = useState(`Scheduled reminder: ${templateName}`)
+  const [message, setMessage] = useState(`Hi {client_name},\n\nReminder about your upcoming appointment. We look forward to seeing you.\n\nThanks,`)
+  const [variableDropdownOpen, setVariableDropdownOpen] = useState(false)
+  const messageRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const addBookingSchedule = () => setBookingSchedules((s) => [...s, { time: 1, type: 'hours before', timeOfDay: '09:00', email: true, whatsapp: false }])
+  const removeBookingSchedule = (i: number) => setBookingSchedules((s) => s.filter((_, idx) => idx !== i))
+  const addQuoteInvoiceSchedule = () => setQuoteInvoiceSchedules((s) => [...s, { timeOfReminder: '08:00', days: 1, email: true, whatsapp: false }])
+  const removeQuoteInvoiceSchedule = (i: number) => setQuoteInvoiceSchedules((s) => s.filter((_, idx) => idx !== i))
+
+  const insertVariable = (value: string) => {
+    const ta = messageRef.current
+    if (ta) {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const before = message.slice(0, start)
+      const after = message.slice(end)
+      setMessage(before + value + after)
+      setVariableDropdownOpen(false)
+      setTimeout(() => ta.focus(), 0)
+    }
+  }
+
+  const previewBody = previewText(message) + '\n\n' + (PREVIEW_REPLACEMENTS['{brand_company_name}'] ?? 'Company Name')
+  const whatsappReadOnlyMessage = previewText(message)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED', border: '1px solid #EAEBED' }}>
+        <div className="flex justify-between items-center p-4 border-b shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <h3 className="text-lg font-semibold" style={{ color: '#1F271B' }}>Edit {templateName}</h3>
+          <button type="button" onClick={onClose} className="p-1.5 rounded hover:bg-gray-100" style={{ color: '#1F271B' }} aria-label="Close">
+            <FiX size={20} />
+          </button>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1 min-h-0 space-y-6">
+          <section>
+            <h4 className={sectionTitleClass} style={{ color: '#1F271B' }}>Schedules</h4>
+            {isBooking ? (
+              <>
+                <div className="space-y-3">
+                  {bookingSchedules.map((row, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 py-2 border-b" style={{ borderColor: '#EAEBED' }}>
+                      <span className="text-sm" style={{ color: '#1F271B' }}>Send a reminder</span>
+                      <input type="number" min={1} max={99} value={row.time} onChange={(e) => setBookingSchedules((s) => s.map((r, j) => (j === i ? { ...r, time: Number(e.target.value) || 1 } : r)))} className="w-14 px-2 py-1.5 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                      <select value={row.type} onChange={(e) => setBookingSchedules((s) => s.map((r, j) => (j === i ? { ...r, type: e.target.value as 'hours before' | 'days before' } : r)))} className="px-2 py-1.5 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
+                        <option value="hours before">hour(s) before</option>
+                        <option value="days before">day(s) before</option>
+                      </select>
+                      <span className="text-sm" style={{ color: '#1F271B' }}>the appointment by</span>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={row.email} onChange={(e) => setBookingSchedules((s) => s.map((r, j) => (j === i ? { ...r, email: e.target.checked } : r)))} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
+                        <span className="text-sm">Email</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={row.whatsapp} onChange={(e) => setBookingSchedules((s) => s.map((r, j) => (j === i ? { ...r, whatsapp: e.target.checked } : r)))} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
+                        <span className="text-sm">WhatsApp</span>
+                      </label>
+                      {row.type === 'days before' && (
+                        <>
+                          <span className="text-sm" style={{ color: '#1F271B' }}>at</span>
+                          <input type="time" value={row.timeOfDay} onChange={(e) => setBookingSchedules((s) => s.map((r, j) => (j === i ? { ...r, timeOfDay: e.target.value } : r)))} className="px-2 py-1.5 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                        </>
+                      )}
+                      {bookingSchedules.length > 1 && (
+                        <button type="button" onClick={() => removeBookingSchedule(i)} className="text-sm font-medium ml-2" style={{ color: '#DC2626' }}>Delete</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addBookingSchedule} className="mt-2 text-sm font-medium" style={{ color: '#28AFB0' }}>Add</button>
+                <p className="text-xs mt-2" style={{ color: '#1F271B', opacity: 0.6 }}>If current time is after the set reminder time, no reminder is sent (e.g. a 6 hours before reminder set for an appointment scheduled 4 hours before would not be sent).</p>
+              </>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {quoteInvoiceSchedules.map((row, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 py-2 border-b" style={{ borderColor: '#EAEBED' }}>
+                      <span className="text-sm" style={{ color: '#1F271B' }}>At</span>
+                      <select value={row.timeOfReminder} onChange={(e) => setQuoteInvoiceSchedules((s) => s.map((r, j) => (j === i ? { ...r, timeOfReminder: e.target.value } : r)))} className="px-2 py-1.5 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
+                        <option value="08:00">8:00 AM</option>
+                        <option value="09:00">9:00 AM</option>
+                        <option value="12:00">12:00 PM</option>
+                        <option value="18:00">6:00 PM</option>
+                        <option value="AnyTime">AnyTime</option>
+                      </select>
+                      <input type="number" min={0} value={row.days} onChange={(e) => setQuoteInvoiceSchedules((s) => s.map((r, j) => (j === i ? { ...r, days: Number(e.target.value) || 0 } : r)))} className="w-14 px-2 py-1.5 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                      <span className="text-sm" style={{ color: '#1F271B' }}>day(s) {reminderKind === 'quote' ? 'after quote sent' : 'after invoices are due'}</span>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={row.email} onChange={(e) => setQuoteInvoiceSchedules((s) => s.map((r, j) => (j === i ? { ...r, email: e.target.checked } : r)))} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
+                        <span className="text-sm">Email</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={row.whatsapp} onChange={(e) => setQuoteInvoiceSchedules((s) => s.map((r, j) => (j === i ? { ...r, whatsapp: e.target.checked } : r)))} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
+                        <span className="text-sm">WhatsApp</span>
+                      </label>
+                      {quoteInvoiceSchedules.length > 1 && (
+                        <button type="button" onClick={() => removeQuoteInvoiceSchedule(i)} className="text-sm font-medium ml-2" style={{ color: '#DC2626' }}>Delete</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addQuoteInvoiceSchedule} className="mt-2 text-sm font-medium" style={{ color: '#28AFB0' }}>Add</button>
+                <p className="text-xs mt-2" style={{ color: '#1F271B', opacity: 0.6 }}>Reminders are only sent if {reminderKind === 'quote' ? 'Quote status: awaiting for approval.' : 'Invoice status: Awaiting for payment or Overdue.'}</p>
+              </>
+            )}
+          </section>
+
+          <section>
+            <h4 className={sectionTitleClass} style={{ color: '#1F271B' }}>Templates</h4>
+            <div className="flex border-b mb-4" style={{ borderColor: '#EAEBED' }}>
+              <button type="button" onClick={() => setActiveTab('email')} className="px-4 py-2 text-sm font-medium border-b-2" style={{ borderBottomColor: activeTab === 'email' ? '#28AFB0' : 'transparent', color: activeTab === 'email' ? '#28AFB0' : '#1F271B' }}>Email</button>
+              <button type="button" onClick={() => setActiveTab('whatsapp')} className="px-4 py-2 text-sm font-medium border-b-2" style={{ borderBottomColor: activeTab === 'whatsapp' ? '#28AFB0' : 'transparent', color: activeTab === 'whatsapp' ? '#28AFB0' : '#1F271B' }}>WhatsApp</button>
+            </div>
+            {activeTab === 'email' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelClass} style={{ color: '#1F271B' }}>Email subject</label>
+                    <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: '#1F271B' }}>Message</label>
+                    <textarea ref={messageRef} rows={6} value={message} onChange={(e) => setMessage(e.target.value)} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+                  </div>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <button type="button" className="text-sm font-medium" style={{ color: '#DC2626' }}>Reset</button>
+                    <div className="relative">
+                      <button type="button" onClick={() => setVariableDropdownOpen((o) => !o)} className="text-sm font-medium" style={{ color: '#28AFB0' }}>Insert variable</button>
+                      {variableDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-10" aria-hidden onClick={() => setVariableDropdownOpen(false)} />
+                          <div className="absolute left-0 top-full mt-1 py-2 rounded-lg border shadow-lg bg-white z-20 max-h-64 overflow-y-auto min-w-[220px]" style={{ borderColor: '#EAEBED' }}>
+                            {VARIABLE_SECTIONS.map(({ section, variables }) => (
+                              <div key={section}>
+                                <p className="px-3 py-1 text-xs font-medium sticky top-0 bg-gray-50" style={{ color: '#6B7280' }}>{section}</p>
+                                {variables.map((v) => (
+                                  <button key={v.value} type="button" onClick={() => insertVariable(v.value)} className="w-full px-3 py-1.5 text-left text-sm font-medium hover:bg-gray-100 block" style={{ color: '#1F271B' }}>{v.label}</button>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg p-4 min-h-[120px]" style={{ backgroundColor: '#F5F0E6' }}>
+                  <p className="text-xs font-medium mb-2" style={{ color: '#1F271B', opacity: 0.7 }}>Preview</p>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: '#1F271B' }}>{previewBody}</p>
+                </div>
+              </div>
+            )}
+            {activeTab === 'whatsapp' && (
+              <div className="p-2">
+                <p className="text-sm mb-2" style={{ color: '#1F271B', opacity: 0.8 }}>Message sent to customers via WhatsApp. Editing is not available yet.</p>
+                <div className="rounded-lg border p-4 bg-gray-50" style={{ borderColor: '#EAEBED' }}>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: '#1F271B' }}>{whatsappReadOnlyMessage}</p>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="p-4 border-t flex justify-end gap-2 shrink-0" style={{ borderColor: '#EAEBED' }}>
+          <button type="button" onClick={onClose} className="px-4 py-2 border rounded text-sm font-medium" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>Cancel</button>
+          <button type="button" className="px-4 py-2 rounded text-sm font-medium text-white" style={{ backgroundColor: '#28AFB0' }}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const MOCK_BANKS = ['Banco de Chile', 'Banco Estado', 'Scotiabank', 'BCI', 'Santander', 'Itaú', 'Other']
+
 function CompanySettings() {
   return (
     <div className="space-y-6 pb-8">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Profile & Company Settings</h1>
+      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Company settings</h1>
 
-      {/* 13.1 Profile & Company Settings - in sequence */}
+      {/* Reply list – send email replies to (client email communication) */}
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Reply list</h2>
+        <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Email addresses that receive replies from client email communication.</p>
+        <div>
+          <label className={labelClass} style={{ color: '#1F271B' }}>Reply-to emails</label>
+          <input type="text" placeholder="e.g. replies@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+        </div>
+      </section>
+
+      {/* Comment: Jobber reference */}
+      <p className="text-xs italic" style={{ color: '#1F271B', opacity: 0.6 }}>
+        See company and Business profile settings in Jobber for reference.
+      </p>
+
+      {/* Due dates of Quote and Invoice */}
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Due dates</h2>
+        <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Default due dates for quote and invoice.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Quote due (days)</label>
+            <input type="number" defaultValue={7} min={1} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Invoice due (days)</label>
+            <input type="number" defaultValue={3} min={1} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>e.g. 3 days to calculate expiration date</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Personal profile */}
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Personal profile</h2>
+        <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Update your personal profile details.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Full name</label>
+            <input type="text" placeholder="Your name" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Email</label>
+            <input type="email" placeholder="you@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+        </div>
+      </section>
+
+      {/* Company details – layout matching design inspiration */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company details</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Update company information used on quotes, invoices, and communications.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Company legal name</label>
-            <input type="text" defaultValue="ABC Services Inc." className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <label className={labelClass} style={{ color: '#1F271B' }}>Company name</label>
+            <input type="text" defaultValue="Water Test" placeholder="Company name" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
           <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Company address</label>
-            <input type="text" defaultValue="123 Business St" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <label className={labelClass} style={{ color: '#1F271B' }}>Phone number</label>
+            <input type="tel" placeholder="+56 9 1234 5678" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
           <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Company phone number</label>
-            <input type="tel" defaultValue="+1 234-567-8900" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <label className={labelClass} style={{ color: '#1F271B' }}>Website URL</label>
+            <div className="flex gap-2 items-center flex-wrap">
+              <input type="url" placeholder="https://" className={`${inputClass} flex-1 min-w-0`} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+              <a href="#" className="text-sm font-medium flex items-center gap-1.5 shrink-0" style={{ color: '#2563EB' }}>
+                <FiZap size={14} />
+                Generate My Website
+              </a>
+            </div>
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Email address</label>
+            <input type="email" placeholder="info@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>Used for customer-facing info, internal notifications, and as Reply Email (e.g. when a customer replies to a quote email).</p>
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Company Country ID (RUT)</label>
             <input type="text" placeholder="RUT / Tax ID" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
-          <div className="md:col-span-2">
-            <label className={labelClass} style={{ color: '#1F271B' }}>Webpage</label>
-            <input type="url" placeholder="https://" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Street 1</label>
+            <input type="text" placeholder="Street address" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Street 2</label>
+            <input type="text" placeholder="Apt, suite, etc. (optional)" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass} style={{ color: '#1F271B' }}>City</label>
+              <input type="text" placeholder="City" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            </div>
+            <div>
+              <label className={labelClass} style={{ color: '#1F271B' }}>State</label>
+              <input type="text" placeholder="State / Region" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            </div>
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Zip code</label>
+            <input type="text" placeholder="Zip code" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
         </div>
       </section>
 
+      {/* Company logo */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company logo</h2>
         <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Used in email messages and on PDFs (quote and invoice).</p>
         <div className="flex items-center gap-4">
-          <div className="w-24 h-24 rounded-lg flex items-center justify-center border" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
+          <div className="w-24 h-24 rounded-lg flex items-center justify-center border shrink-0" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
             <span className="text-xs" style={{ color: '#1F271B', opacity: 0.5 }}>Logo</span>
           </div>
           <button type="button" className="px-4 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
@@ -326,360 +1029,114 @@ function CompanySettings() {
         </div>
       </section>
 
+      {/* Company colors – 2 colors for document personalization */}
+      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company colors</h2>
+        <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Two colors for document personalization (quotes, invoices, PDFs).</p>
+        <div className="flex flex-wrap gap-6">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium w-24 shrink-0" style={{ color: '#1F271B' }}>Color 1</label>
+            <input type="color" defaultValue="#28AFB0" className="w-10 h-10 rounded border cursor-pointer" style={{ borderColor: '#EAEBED', padding: 2 }} />
+            <input type="text" defaultValue="#28AFB0" className="w-24 px-2 py-1.5 border rounded text-sm font-mono" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium w-24 shrink-0" style={{ color: '#1F271B' }}>Color 2</label>
+            <input type="color" defaultValue="#1F271B" className="w-10 h-10 rounded border cursor-pointer" style={{ borderColor: '#EAEBED', padding: 2 }} />
+            <input type="text" defaultValue="#1F271B" className="w-24 px-2 py-1.5 border rounded text-sm font-mono" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+          </div>
+        </div>
+      </section>
+
+      {/* Bank details */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Bank details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Bank</label>
-            <input type="text" defaultValue="First National Bank" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <select className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
+              {MOCK_BANKS.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Account type</label>
             <select className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
-              <option>Checking</option>
-              <option>Savings</option>
+              <option>Cuenta corriente</option>
+              <option>Cuenta Vista / RUT</option>
+              <option>Cuenta de Ahorro</option>
             </select>
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Account number</label>
-            <input type="text" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <input type="text" placeholder="Account number" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Email for payment notifications</label>
             <input type="email" placeholder="payments@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
+          <div>
+            <label className={labelClass} style={{ color: '#1F271B' }}>Online payment link</label>
+            <input type="url" placeholder="https://payment-link.example.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>URL to share with customers for online payment.</p>
+          </div>
         </div>
       </section>
 
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Online payment link support</h2>
-        <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Transbank, MercadoPago, or others.</p>
-        <div className="flex flex-wrap gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm" style={{ color: '#1F271B' }}>Transbank</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm" style={{ color: '#1F271B' }}>MercadoPago</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm" style={{ color: '#1F271B' }}>Other</span>
-          </label>
-        </div>
-      </section>
-
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Email for notifications</h2>
-        <label className={labelClass} style={{ color: '#1F271B' }}>Email</label>
-        <input type="email" placeholder="notifications@company.com" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
-      </section>
-
+      {/* Terms & conditions */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Terms & conditions</h2>
         <div className="space-y-4">
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Budget (Quote) Terms & Conditions</label>
-            <textarea rows={4} defaultValue="Payment terms: Net 30 days." className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <textarea rows={4} placeholder="Payment terms for quotes…" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Invoice Terms & Conditions</label>
-            <textarea rows={4} defaultValue="Payment due within 30 days." className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-          </div>
-          <div className="max-w-xs">
-            <label className={labelClass} style={{ color: '#1F271B' }}>Invoice due (days)</label>
-            <input type="number" defaultValue={3} min={1} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-            <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>e.g. 3 days = expiration date</p>
+            <textarea rows={4} placeholder="Payment due terms for invoices…" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
         </div>
       </section>
 
+      {/* Arrival window */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Booking & scheduling</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Arrival window</label>
-            <input type="text" placeholder="e.g. 30 min" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-          </div>
-          <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Duration (default)</label>
-            <select className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
-              <option>30 min</option>
-              <option>1 hour</option>
-              <option>2 hours</option>
-              <option>Half day</option>
-              <option>Full day</option>
-            </select>
-          </div>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Arrival window</h2>
+        <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Number of hours (1–4) added to the scheduled start time to define the arrival range shown to the customer. Used for booking confirmation.</p>
+        <div className="flex items-center gap-3">
+          <label className={labelClass} style={{ color: '#1F271B' }}>Arrival window (hours)</label>
+          <select className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '120px' }}>
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+            <option value={3}>3</option>
+            <option value={4}>4</option>
+          </select>
         </div>
         <p className="text-xs mt-2" style={{ color: '#1F271B', opacity: 0.6 }}>
-          Arrival window logic: takes start time and adds the arrival window. Used for booking confirmation.
+          Logic: takes the scheduled start time and adds the arrival window; this range is what we inform the customer for arrivals and use for booking confirmation.
         </p>
       </section>
 
+      {/* WhatsApp sender */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>WhatsApp sender</h2>
-        <label className={labelClass} style={{ color: '#1F271B' }}>Sender name or number</label>
-        <input type="text" placeholder="Sender name or number" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
+        <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Company WhatsApp number used for automated messages.</p>
+        <input type="text" placeholder="+56 9 1234 5678" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
       </section>
 
+      {/* Tax */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Tax</h2>
+        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Tax (VAT / IVA)</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Tax ID (VAT / IVA)</label>
-            <input type="text" defaultValue="12-3456789-0" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <label className={labelClass} style={{ color: '#1F271B' }}>Tax ID</label>
+            <input type="text" placeholder="12.345.678-9" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
           </div>
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Default tax rate (%)</label>
-            <input type="number" defaultValue={19} min={0} step={0.01} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <input type="number" defaultValue={19} min={0} step={0.01} placeholder="19" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>Example: 19%</p>
           </div>
         </div>
-      </section>
-
-      <div className="flex justify-end">
-        <button type="button" className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
-          <FiSave size={18} />
-          Save changes
-        </button>
-      </div>
-    </div>
-  )
-}
-
-const TEMPLATE_IDS = [
-  'booking-confirmation',
-  'quote',
-  'quote-follow-up',
-  'invoice',
-  'invoice-follow-up',
-  'schedule-confirmation',
-  'schedule-confirmation-reminder',
-  'workorder-report',
-] as const
-
-const TEMPLATE_LABELS: Record<string, string> = {
-  'booking-confirmation': 'Booking Confirmation',
-  'quote': 'Quote',
-  'quote-follow-up': 'Quote Follow Up',
-  'invoice': 'Invoice',
-  'invoice-follow-up': 'Invoice Follow Up',
-  'schedule-confirmation': 'Schedule Confirmation',
-  'schedule-confirmation-reminder': 'Schedule Confirmation Reminder',
-  'workorder-report': 'Work Order Report',
-}
-
-function EmailTemplates() {
-  return (
-    <div className="space-y-6 pb-8">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Templates</h1>
-      <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
-        Templates for invoice, invoice follow up, quote, quote follow up, schedule confirmation, schedule confirmation reminder, and work order report.
-      </p>
-
-      {TEMPLATE_IDS.map((id) => (
-        <section key={id} className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-          <div className="flex justify-between items-start mb-4">
-            <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>{TEMPLATE_LABELS[id] || id}</h2>
-            <div className="flex items-center gap-4">
-              <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>Channel:</span>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-                <FiMail size={14} />
-                <span className="text-sm">Email</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-                <FiMessageCircle size={14} />
-                <span className="text-sm">WhatsApp</span>
-              </label>
-            </div>
-          </div>
-          {id === 'booking-confirmation' && (
-            <label className="flex items-center gap-2 mb-4 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-              <span className="text-sm" style={{ color: '#1F271B' }}>Include assigned team members&apos; profile picture</span>
-            </label>
-          )}
-          <div className="space-y-3">
-            <div>
-              <label className={labelClass} style={{ color: '#1F271B' }}>Subject</label>
-              <input type="text" defaultValue={`${TEMPLATE_LABELS[id]} from Company`} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-            </div>
-            <div>
-              <label className={labelClass} style={{ color: '#1F271B' }}>Message</label>
-              <textarea rows={5} defaultValue={`Hi {client_name},\n\nMessage body. You can use variables like {job_title}, {quote_total}, {invoice_number}.`} className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>Insert variable:</span>
-              <select className="px-2 py-1 border rounded text-xs" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
-                <option value="{client_name}">client_name</option>
-                <option value="{job_title}">job_title</option>
-                <option value="{quote_total}">quote_total</option>
-                <option value="{invoice_number}">invoice_number</option>
-                <option value="{company_name}">company_name</option>
-              </select>
-            </div>
-            <button type="button" className="text-sm font-medium" style={{ color: '#28AFB0' }}>Reset to system default</button>
-          </div>
-        </section>
-      ))}
-
-      <div className="flex justify-end">
-        <button type="button" className="px-6 py-2 rounded text-sm font-medium flex items-center gap-2 text-white" style={{ backgroundColor: '#28AFB0' }}>
-          <FiSave size={18} />
-          Save changes
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function RemindersSettings() {
-  const [bookingRows, setBookingRows] = useState([{ timeBefore: 2, timeType: 'days' as 'hours' | 'days', timeOfDay: '18:00', channel: ['email'] as ('email' | 'whatsapp')[] }, { timeBefore: 1, timeType: 'days', timeOfDay: '12:00', channel: ['whatsapp'] }])
-  const addBookingRow = () => setBookingRows((r) => [...r, { timeBefore: 1, timeType: 'days', timeOfDay: '18:00', channel: ['email'] }])
-  return (
-    <div className="space-y-6 pb-8">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Reminders</h1>
-      <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>
-        Configure reminders for budget (quote), booking confirmation, invoice, and customer follow-ups. Enable or disable each type below. Reminders can be sent by email, WhatsApp, or both. You can resend reminders manually at any time without affecting the scheduled reminders.
-      </p>
-
-      {/* Budget (Quote) reminders */}
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Budget (Quote) reminders</h2>
-        <p className="text-xs mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
-          <strong>Restriction:</strong> Sent only when budget status is &quot;waiting for approval&quot;. If budget is approved, no reminder is sent.
-        </p>
-        <label className="flex items-center gap-2 mb-4 cursor-pointer">
-          <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Enable budget reminders</span>
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Reminder 1</label>
-            <div className="flex gap-2 items-center flex-wrap">
-              <input type="number" defaultValue={48} className="w-20 px-2 py-2 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-              <span className="text-sm" style={{ color: '#1F271B' }}>hours after sent</span>
-            </div>
-          </div>
-          <div>
-            <label className={labelClass} style={{ color: '#1F271B' }}>Reminder 2</label>
-            <div className="flex gap-2 items-center flex-wrap">
-              <input type="number" defaultValue={120} className="w-20 px-2 py-2 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-              <span className="text-sm" style={{ color: '#1F271B' }}>hours (5 days) after sent</span>
-            </div>
-          </div>
-        </div>
-        <p className={labelClass} style={{ color: '#1F271B' }}>Channel</p>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm">Email</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm">WhatsApp</span>
-          </label>
-        </div>
-      </section>
-
-      {/* Booking confirmation reminder */}
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Booking confirmation reminder</h2>
-        <p className="text-xs mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
-          Examples: Email 2 days before the job at 18:00. WhatsApp 1 day before at noon. For jobs scheduled for the next day after 12:00, no reminder is sent. Same logic applies to the 2-day threshold for the first reminder.
-        </p>
-        <label className="flex items-center gap-2 mb-4 cursor-pointer">
-          <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Enable booking reminders</span>
-        </label>
-        <div className="space-y-4">
-          {bookingRows.map((row, i) => (
-            <div key={i} className="flex flex-wrap items-end gap-3 p-3 rounded-lg" style={{ backgroundColor: '#F9FAFB', borderColor: '#EAEBED', border: '1px solid transparent' }}>
-              <div>
-                <label className={labelClass} style={{ color: '#1F271B' }}>Time before appointment</label>
-                <div className="flex gap-2">
-                  <input type="number" min={1} max={99} defaultValue={row.timeBefore} className="w-16 px-2 py-2 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-                  <select defaultValue={row.timeType} className="px-2 py-2 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>
-                    <option value="hours">hours</option>
-                    <option value="days">days</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className={labelClass} style={{ color: '#1F271B' }}>Time of reminder</label>
-                <input type="time" defaultValue={row.timeOfDay} className="px-3 py-2 border rounded text-sm" style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
-              </div>
-              <div>
-                <label className={labelClass} style={{ color: '#1F271B' }}>Channel</label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" defaultChecked={row.channel.includes('email')} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-                    <span className="text-sm">Email</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" defaultChecked={row.channel.includes('whatsapp')} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-                    <span className="text-sm">WhatsApp</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          ))}
-          <button type="button" onClick={addBookingRow} className="text-sm font-medium" style={{ color: '#28AFB0' }}>+ Add reminder</button>
-        </div>
-      </section>
-
-      {/* Invoice reminders */}
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Invoice reminders</h2>
-        <p className="text-xs mb-3" style={{ color: '#1F271B', opacity: 0.6 }}>
-          <strong>Restriction:</strong> If invoice is paid, no reminder is sent.
-        </p>
-        <label className="flex items-center gap-2 mb-4 cursor-pointer">
-          <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Enable invoice reminders</span>
-        </label>
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm">Reminder 1: on day due</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-            <span className="text-sm">Reminder 2: 2 days after invoice is due</span>
-          </label>
-        </div>
-      </section>
-
-      {/* Customer / Campaign reminders */}
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Campaigns: maintenance / offer (Customer reminder)</h2>
-        <p className="text-sm mb-2" style={{ color: '#1F271B', opacity: 0.8 }}>
-          Configure reminders per client to send maintenance follow-ups and offers. Customer reminder can be set at work order level or customer level (always associated with the customer). Set a reminder date and note.
-        </p>
-        <ul className="text-xs mb-3 list-disc list-inside space-y-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-          <li>When reminder date is triggered (today &gt; reminder date), client status changes to &quot;Follow up&quot;.</li>
-          <li>Client statuses: <strong>Active</strong>, <strong>Archived</strong>, <strong>Follow up</strong> — filterable in client list view.</li>
-          <li>When in Follow up: in customer detail view (and list view) — <strong>Send Email</strong> (same template as quote). Optional: <strong>Send Campaign</strong> (bulk send after selecting clients in list view).</li>
-          <li>Reminders can be resent manually at any time, independently from the schedule.</li>
-        </ul>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" defaultChecked className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
-          <span className="text-sm font-medium" style={{ color: '#1F271B' }}>Enable customer reminders</span>
-        </label>
-      </section>
-
-      {/* Email format & defaults */}
-      <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
-        <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Email format &amp; defaults</h2>
-        <p className="text-sm mb-2" style={{ color: '#1F271B', opacity: 0.8 }}>
-          Reminder emails are sent from the company owner. Use the default subject (Jobber-style) or customize per template. A default template is loaded in the platform for every message type.
-        </p>
-        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-          Resend reminders manually at any time without disturbing the scheduled reminders already programmed.
-        </p>
       </section>
 
       <div className="flex justify-end">
@@ -718,7 +1175,6 @@ function RolesPermissionsSettings({ roles, setRoles }: { roles: RoleDef[]; setRo
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Minimum required roles</h2>
         <ul className="space-y-2 text-sm mb-4" style={{ color: '#1F271B', opacity: 0.85 }}>
-          <li><strong>Super Admin (me)</strong> — Full system control.</li>
           <li><strong>Admin / Owner (Service company)</strong> — Full access to all modules and configuration.</li>
           <li><strong>Technician</strong> — Access only to assigned jobs; can update job/visit status and submit work reports.</li>
         </ul>
@@ -748,7 +1204,7 @@ function RolesPermissionsSettings({ roles, setRoles }: { roles: RoleDef[]; setRo
               </tr>
             </thead>
             <tbody>
-              {roles.map((r) => (
+              {roles.filter((r) => r.id !== 'super-admin').map((r) => (
                 <tr key={r.id} className="border-b" style={{ borderColor: '#EAEBED' }}>
                   <td className="px-4 py-3">
                     <span className="font-medium" style={{ color: '#1F271B' }}>{r.name}</span>
@@ -859,20 +1315,32 @@ function AddEditRoleModal({
   )
 }
 
+type TeamMemberRow = MockTeamMember
+
 function TeamSettings({ roleOptions }: { roleOptions: string[] }) {
+  const [members, setMembers] = useState<TeamMemberRow[]>(() => [...mockTeamMembers])
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingMember, setEditingMember] = useState<{ id: number; name: string; email: string; phone: string; rut: string; role: string; hasPicture: boolean } | null>(null)
-  const [members, setMembers] = useState([
-    { id: 1, name: 'Tom Wilson', email: 'tom.wilson@company.com', phone: '+1 234-567-8900', rut: '', role: 'Technician', hasPicture: true },
-  ])
+  const [editingMember, setEditingMember] = useState<TeamMemberRow | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<number | null>(null)
+
+  const syncFromMock = () => setMembers([...mockTeamMembers])
 
   const openAdd = () => {
     setEditingMember(null)
     setModalOpen(true)
   }
-  const openEdit = (m: (typeof members)[0]) => {
+  const openEdit = (m: TeamMemberRow) => {
     setEditingMember(m)
+    setActionsOpenId(null)
     setModalOpen(true)
+  }
+  const setActive = (id: number, active: boolean) => {
+    const m = mockTeamMembers.find((x) => x.id === id)
+    if (m) {
+      m.active = active
+      syncFromMock()
+    }
+    setActionsOpenId(null)
   }
 
   return (
@@ -880,7 +1348,7 @@ function TeamSettings({ roleOptions }: { roleOptions: string[] }) {
       <div>
         <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Team Management</h1>
         <p className="text-sm mt-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-          Business owners can add team members. Assign roles and permissions to each team member.
+          Add or manage team members. Deactivated users cannot be assigned to new visits; past visits still show them as assigned.
         </p>
       </div>
       <div className="flex justify-end">
@@ -898,25 +1366,97 @@ function TeamSettings({ roleOptions }: { roleOptions: string[] }) {
         <table className="w-full">
           <thead style={{ backgroundColor: '#F3F4F6' }}>
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Name</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Email</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Role</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Actions</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>NAME</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>EMAIL</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>LAST LOGIN</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold w-24" style={{ color: '#1F271B' }}>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => (
-              <tr key={m.id} className="border-b" style={{ borderColor: '#EAEBED' }}>
-                <td className="px-4 py-3 text-sm" style={{ color: '#1F271B' }}>{m.name}</td>
-                <td className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.8 }}>{m.email}</td>
-                <td className="px-4 py-3">
-                  <span className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(43, 80, 170, 0.2)', color: '#1F3A7A' }}>{m.role}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <button type="button" onClick={() => openEdit(m)} className="text-sm font-medium" style={{ color: '#28AFB0' }}>Edit</button>
-                </td>
-              </tr>
-            ))}
+            {members.map((m) => {
+              const active = m.active
+              const initials = m.name.split(/\s+/).map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+              return (
+                <tr key={m.id} className="border-b" style={{ borderColor: '#EAEBED', opacity: active ? 1 : 0.7 }}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0" style={{ backgroundColor: active ? 'rgba(43, 80, 170, 0.2)' : '#E5E7EB', color: active ? '#1F3A7A' : '#6B7280' }}>
+                        {initials}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: '#1F271B' }}>{m.name}</p>
+                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{m.role}{!active && ' · Inactive'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.8 }}>{m.email}</td>
+                  <td className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>—</td>
+                  <td className="px-4 py-3 relative">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(m)}
+                        className="text-sm font-medium"
+                        style={{ color: '#28AFB0' }}
+                      >
+                        Edit
+                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setActionsOpenId(actionsOpenId === m.id ? null : m.id)}
+                          className="p-1.5 rounded hover:bg-gray-100"
+                          style={{ color: '#1F271B' }}
+                          aria-label="Actions"
+                        >
+                          <FiMoreVertical size={18} />
+                        </button>
+                        {actionsOpenId === m.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" aria-hidden onClick={() => setActionsOpenId(null)} />
+                            <div
+                              className="absolute right-0 top-full mt-1 py-1 rounded-lg border shadow-lg bg-white z-20 min-w-[180px]"
+                              style={{ borderColor: '#EAEBED' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => openEdit(m)}
+                                className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50"
+                                style={{ color: '#1F271B' }}
+                              >
+                                <FiMail size={14} />
+                                Resend invitation
+                              </button>
+                              {active ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setActive(m.id, false)}
+                                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-red-50"
+                                  style={{ color: '#DC2626' }}
+                                >
+                                  <FiUserMinus size={14} />
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setActive(m.id, true)}
+                                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-50"
+                                  style={{ color: '#28AFB0' }}
+                                >
+                                  <FiUserPlus size={14} />
+                                  Reactivate
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -924,15 +1464,23 @@ function TeamSettings({ roleOptions }: { roleOptions: string[] }) {
       {modalOpen && (
         <AddTeamMemberModal
           roleOptions={roleOptions.length > 0 ? roleOptions : ['Admin / Owner (Service company)', 'Technician']}
-          initial={editingMember ?? undefined}
+          initial={editingMember ? { ...editingMember, hasPicture: !!editingMember.picture } : undefined}
           onClose={() => { setModalOpen(false); setEditingMember(null) }}
           onSave={(member) => {
-            const { password: _p, ...rest } = member
+            const { password: _p, hasPicture: _h, ...rest } = member
             if (editingMember) {
-              setMembers((prev) => prev.map((m) => (m.id === editingMember.id ? { ...rest, id: m.id } : m)))
+              const idx = mockTeamMembers.findIndex((x) => x.id === editingMember.id)
+              if (idx >= 0) Object.assign(mockTeamMembers[idx], rest)
             } else {
-              setMembers((prev) => [...prev, { ...rest, id: Math.max(0, ...prev.map((m) => m.id)) + 1 }])
+              const newId = Math.max(0, ...mockTeamMembers.map((x) => x.id)) + 1
+              mockTeamMembers.push({
+                id: newId,
+                ...rest,
+                picture: '',
+                active: true,
+              })
             }
+            syncFromMock()
             setModalOpen(false)
             setEditingMember(null)
           }}
@@ -1157,28 +1705,28 @@ function ServicesSettings() {
               <th className="px-4 py-3 text-right text-sm font-semibold" style={{ color: '#1F271B' }}>Cost</th>
               <th className="px-4 py-3 text-right text-sm font-semibold" style={{ color: '#1F271B' }}>Markup %</th>
               <th className="px-4 py-3 text-right text-sm font-semibold" style={{ color: '#1F271B' }}>Price</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold w-20" style={{ color: '#1F271B' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr className="border-b" style={{ borderColor: '#EAEBED' }}>
-                <td className="px-4 py-8 text-sm text-center" style={{ color: '#1F271B', opacity: 0.6 }} colSpan={7}>
+                <td className="px-4 py-8 text-sm text-center" style={{ color: '#1F271B', opacity: 0.6 }} colSpan={6}>
                   No items yet. Add items or import to build your master price list.
                 </td>
               </tr>
             ) : (
               filtered.map((item) => (
-                <tr key={item.id} className="border-b" style={{ borderColor: '#EAEBED' }}>
+                <tr
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(item.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(item.id) } }}
+                  className="border-b cursor-pointer transition-colors hover:bg-gray-50"
+                  style={{ borderColor: '#EAEBED' }}
+                >
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(item.id)}
-                      className="text-sm font-medium text-left hover:underline"
-                      style={{ color: '#2B50AA' }}
-                    >
-                      {item.name}
-                    </button>
+                    <span className="text-sm font-medium" style={{ color: '#2B50AA' }}>{item.name}</span>
                   </td>
                   <td className="px-4 py-3 text-sm max-w-xs truncate" style={{ color: '#1F271B', opacity: 0.8 }} title={item.description}>
                     {item.description || '—'}
@@ -1187,11 +1735,6 @@ function ServicesSettings() {
                   <td className="px-4 py-3 text-sm text-right" style={{ color: '#1F271B' }}>Rs{item.cost.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm text-right" style={{ color: '#1F271B' }}>{item.markupPercent}%</td>
                   <td className="px-4 py-3 text-sm text-right font-medium" style={{ color: '#1F271B' }}>Rs{item.price.toFixed(2)}</td>
-                  <td className="px-4 py-3">
-                    <button type="button" onClick={() => openEdit(item.id)} className="text-sm font-medium" style={{ color: '#28AFB0' }}>
-                      Edit
-                    </button>
-                  </td>
                 </tr>
               ))
             )}
