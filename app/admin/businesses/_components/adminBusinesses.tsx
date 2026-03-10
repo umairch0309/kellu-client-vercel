@@ -97,13 +97,6 @@ export default function AdminBusinessesList() {
         <h1 className="text-2xl md:text-3xl font-bold text-neutral-dark">
           Businesses
         </h1>
-        <button
-          className="px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-          style={{ backgroundColor: "#28AFB0", color: "white" }}
-        >
-          <Plus size={18} />
-          <span>Create Business</span>
-        </button>
       </div>
 
       {/* Businesses List */}
