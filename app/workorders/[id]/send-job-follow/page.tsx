@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import SendJobFollowPage from '@/components/SendJobFollowPage'
+import SendJobFollowPage from '@/app/workorders/_components/SendJobFollowPage'
 
 export default function SendJobFollowRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)

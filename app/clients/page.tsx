@@ -2,7 +2,7 @@
 
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import ClientsList from '@/components/ClientsList'
+import ClientsList from '@/app/clients/_components/ClientsList'
 
 export default function ClientsPage() {
   return (

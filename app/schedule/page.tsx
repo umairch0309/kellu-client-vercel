@@ -2,7 +2,7 @@
 
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import ScheduleView from '@/components/ScheduleView'
+import ScheduleView from '@/app/schedule/_components/ScheduleView'
 
 export default function SchedulePage() {
   return (

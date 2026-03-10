@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import SendBookingConfirmationPage from '@/components/SendBookingConfirmationPage'
+import SendBookingConfirmationPage from '@/app/workorders/_components/SendBookingConfirmationPage'
 
 export default function SendBookingConfirmationRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)

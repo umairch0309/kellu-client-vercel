@@ -2,7 +2,7 @@
 
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import QuotesList from '@/components/QuotesList'
+import QuotesList from '@/app/quotes/_components/QuotesList'
 
 export default function QuotesPage() {
   return (

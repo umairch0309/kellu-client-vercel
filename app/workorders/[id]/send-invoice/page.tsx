@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import SendInvoicePage from '@/components/SendInvoicePage'
+import SendInvoicePage from '@/app/workorders/_components/SendInvoicePage'
 
 export default function SendInvoiceRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)

@@ -1,10 +1,15 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import ClientProviders from '@/components/ClientProviders'
+import ClientProviders from '@/app/clients/_components/ClientProviders'
 
 export const metadata: Metadata = {
   title: 'Kellu - Business Management Platform',
   description: 'Manage your business operations efficiently',
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 }
 
 export default function RootLayout({
@@ -23,4 +28,3 @@ export default function RootLayout({
     </html>
   )
 }
-

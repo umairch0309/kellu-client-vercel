@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import SendQuotePage from '@/components/SendQuotePage'
+import SendQuotePage from '@/app/workorders/_components/SendQuotePage'
 
 export default function SendQuoteRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)

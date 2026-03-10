@@ -2,7 +2,7 @@
 
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import NewWorkorderForm from '@/components/NewWorkorderForm'
+import NewWorkorderForm from '@/app/workorders/_components/NewWorkorderForm'
 
 export default function NewWorkorderPage() {
   return (

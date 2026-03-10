@@ -3,7 +3,7 @@
 import { Suspense } from 'react'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import SettingsView from '@/components/SettingsView'
+import SettingsView from '@/app/settings/_components/SettingsView'
 
 export default function SettingsPage() {
   return (

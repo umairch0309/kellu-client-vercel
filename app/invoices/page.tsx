@@ -2,7 +2,7 @@
 
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import InvoicesList from '@/components/InvoicesList'
+import InvoicesList from '@/app/invoices/_components/InvoicesList'
 
 export default function InvoicesPage() {
   return (
