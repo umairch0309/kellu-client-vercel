@@ -13,6 +13,7 @@ import {
   Download,
   TrendingUp,
   TrendingDown,
+  FileImage,
 } from "lucide-react"
 
 import {
@@ -26,6 +27,7 @@ import {
 } from "recharts"
 
 import { Button } from "@/components/ui/button"
+import { useChartExport } from "@/hooks/use-chart-export"
 
 const revenueData = [
   { month: "Jan", revenue: 45000 },
@@ -92,10 +94,16 @@ function KPICard({
 }
 
 export function AdminDashboard() {
+  const { chartRef, exportChart, isExporting, exportingFormat } = useChartExport({
+    filename: "revenue-over-time",
+    backgroundColor: "#ffffff",
+    scale: 2,
+  })
+
   return (
     <div className="space-y-6">
 
-      {/* KPI SECTION */}
+      {/* KPI section */}
       <div>
         <h2 className="text-base font-bold text-neutral-dark mb-2.5">
           Platform Overview
@@ -112,7 +120,7 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* SYSTEM HEALTH */}
+      {/* System health */}
       <div>
         <h2 className="text-base font-bold text-neutral-dark mb-2.5">
           System Health
@@ -127,22 +135,39 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* REVENUE CHART */}
+      {/* Revenue chart */}
       <div>
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="text-base font-bold text-neutral-dark">
             Revenue Over Time
           </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            className="px-3 py-1.5 text-xs"
-          >
-            <Download size={14} className="mr-1.5" />
-            Export
-          </Button>
+
+          {/* Export buttons */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline" 
+              size="sm"
+              disabled={isExporting}
+              onClick={() => exportChart("png")}
+              className="px-3 py-1.5 text-xs bg-[#F3F4F6] text-neutral-dark border-[#EAEBED] hover:border-[#D1D5DB] hover:bg-[#F3F4F6]"
+            >
+              <FileImage size={14} className="mr-1.5" />
+              {exportingFormat === "png" ? "Exporting…" : "Export PNG"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isExporting}
+              onClick={() => exportChart("pdf")}
+              className="px-3 py-1.5 text-xs bg-[#28AFB0] text-white border-none hover:bg-[#28AFB0]/90 hover:text-white"
+            >
+              <Download size={14} className="mr-1.5" />
+              {exportingFormat === "pdf" ? "Exporting…" : "Export PDF"}
+            </Button>
+          </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-[#EAEBED] p-4">
+
+        <div ref={chartRef} className="bg-white rounded-lg shadow-sm border border-[#EAEBED] p-4">
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={revenueData}>

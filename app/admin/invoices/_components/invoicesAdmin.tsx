@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { FiSearch, FiChevronDown, FiChevronRight, FiTrendingUp } from 'react-icons/fi'
 
 type InvoiceStatus = 'paid' | 'overdue' | 'pending' | 'draft'
@@ -43,6 +44,7 @@ const formatAmount = (n: number) => {
 }
 
 export function AdminInvoices() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [businessFilter, setBusinessFilter] = useState('all')
@@ -85,7 +87,7 @@ export function AdminInvoices() {
   const paidTotal = paidInvoices.reduce((s, i) => s + i.amount, 0)
   const totalVolume = mockInvoices.reduce((s, i) => s + i.amount, 0)
   const averageInvoice = mockInvoices.length > 0 ? totalVolume / mockInvoices.length : 0
-
+  
   const filteredInvoices = mockInvoices.filter(invoice => {
     const matchesSearch =
       invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,20 +114,13 @@ export function AdminInvoices() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h1 className="text-xl md:text-2xl font-bold" style={{ color: '#1F271B' }}>Invoices</h1>
       </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* Card 1: Overview */}
-        <div
-          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
-          style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
-        >
+        <div className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md" style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}>
           <div className="h-0.5" style={{ backgroundColor: '#28AFB0' }} />
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
@@ -134,13 +129,7 @@ export function AdminInvoices() {
             </div>
             <div className="space-y-1.5">
               {overviewLinks.map(({ status, label, count, amount, bulletColor }) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setStatusFilter(prev => prev === status ? 'all' : status)}
-                  className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
-                  style={{ backgroundColor: statusFilter === status ? 'rgba(40, 175, 176, 0.12)' : 'transparent' }}
-                >
+                <button key={status} type="button" onClick={() => setStatusFilter(prev => prev === status ? 'all' : status)} className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors" style={{ backgroundColor: statusFilter === status ? 'rgba(40, 175, 176, 0.12)' : 'transparent' }}>
                   <span className="flex items-center gap-1.5 min-w-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bulletColor }} />
                     <span className="text-[10px] truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{label}</span>
@@ -152,13 +141,7 @@ export function AdminInvoices() {
           </div>
         </div>
 
-        {/* Card 2: Paid */}
-        <div
-          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
-          style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
-        >
+        <div className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md" style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}>
           <div className="h-0.5" style={{ backgroundColor: '#28AFB0' }} />
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
@@ -178,13 +161,7 @@ export function AdminInvoices() {
           </div>
         </div>
 
-        {/* Card 3: Average invoice */}
-        <div
-          className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
-          style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
-        >
+        <div className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md" style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)' }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}>
           <div className="h-0.5" style={{ backgroundColor: '#2B50AA' }} />
           <div className="p-3">
             <div className="flex justify-between items-start mb-1.5">
@@ -208,35 +185,14 @@ export function AdminInvoices() {
           </h2>
           <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end flex-wrap">
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-xs font-medium hover:underline px-1"
-                style={{ color: '#28AFB0' }}
-              >
+              <button type="button" onClick={clearAllFilters} className="text-xs font-medium hover:underline px-1" style={{ color: '#28AFB0' }}>
                 Clear filters
               </button>
             )}
 
-            {/* Business Filter Dropdown */}
+            {/* Business Filter */}
             <div className="relative" ref={businessDropdownRef}>
-              <button
-                onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)}
-                className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-                style={{
-                  backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white',
-                  borderColor: '#EAEBED',
-                  color: '#1F271B',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#D1D5DB'
-                  if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED'
-                  if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = 'white'
-                }}
-              >
+              <button onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)} className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md" style={{ backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white', borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB' }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#EAEBED'; if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = 'white' }}>
                 <span className="font-semibold" style={{ color: '#1F271B' }}>Business</span>
                 <span style={{ color: '#1F271B', opacity: 0.5 }}>|</span>
                 <span style={{ color: '#1F271B', opacity: 0.8 }}>{businessFilter === 'all' ? 'All' : businessFilter}</span>
@@ -247,45 +203,19 @@ export function AdminInvoices() {
                   {businessFilterOptions.map((opt, idx) => (
                     <span key={opt.value}>
                       {idx > 0 && <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />}
-                      <button
-                        onClick={() => { setBusinessFilter(opt.value); setIsBusinessDropdownOpen(false) }}
-                        className="w-full text-left px-2 py-1.5 text-xs transition-colors"
-                        style={{ color: '#1F271B', backgroundColor: businessFilter === opt.value ? '#F3F4F6' : 'white' }}
-                        onMouseEnter={(e) => { if (businessFilter !== opt.value) e.currentTarget.style.backgroundColor = '#F9FAFB' }}
-                        onMouseLeave={(e) => { if (businessFilter !== opt.value) e.currentTarget.style.backgroundColor = 'white' }}
-                      >
-                        {opt.label}
-                      </button>
+                      <button onClick={() => { setBusinessFilter(opt.value); setIsBusinessDropdownOpen(false) }} className="w-full text-left px-2 py-1.5 text-xs transition-colors" style={{ color: '#1F271B', backgroundColor: businessFilter === opt.value ? '#F3F4F6' : 'white' }} onMouseEnter={(e) => { if (businessFilter !== opt.value) e.currentTarget.style.backgroundColor = '#F9FAFB' }} onMouseLeave={(e) => { if (businessFilter !== opt.value) e.currentTarget.style.backgroundColor = 'white' }}>{opt.label}</button>
                     </span>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Status Filter Dropdown */}
+            {/* Status Filter */}
             <div className="relative" ref={statusDropdownRef}>
-              <button
-                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-                style={{
-                  backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white',
-                  borderColor: '#EAEBED',
-                  color: '#1F271B',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#D1D5DB'
-                  if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED'
-                  if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = 'white'
-                }}
-              >
+              <button onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)} className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md" style={{ backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white', borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB' }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#EAEBED'; if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = 'white' }}>
                 <span className="font-semibold" style={{ color: '#1F271B' }}>Status</span>
                 <span style={{ color: '#1F271B', opacity: 0.5 }}>|</span>
-                <span style={{ color: '#1F271B', opacity: 0.8 }}>
-                  {statusFilterOptions.find(o => o.value === statusFilter)?.label ?? statusFilter}
-                </span>
+                <span style={{ color: '#1F271B', opacity: 0.8 }}>{statusFilterOptions.find(o => o.value === statusFilter)?.label ?? statusFilter}</span>
                 <FiChevronDown size={12} className={`transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} style={{ color: '#1F271B', opacity: 0.6 }} />
               </button>
               {isStatusDropdownOpen && (
@@ -293,46 +223,17 @@ export function AdminInvoices() {
                   {statusFilterOptions.map((opt, idx) => (
                     <span key={opt.value}>
                       {idx > 0 && <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />}
-                      <button
-                        onClick={() => { setStatusFilter(opt.value); setIsStatusDropdownOpen(false) }}
-                        className="w-full text-left px-2 py-1.5 text-xs transition-colors"
-                        style={{ color: '#1F271B', backgroundColor: statusFilter === opt.value ? '#F3F4F6' : 'white' }}
-                        onMouseEnter={(e) => { if (statusFilter !== opt.value) e.currentTarget.style.backgroundColor = '#F9FAFB' }}
-                        onMouseLeave={(e) => { if (statusFilter !== opt.value) e.currentTarget.style.backgroundColor = 'white' }}
-                      >
-                        {opt.label}
-                      </button>
+                      <button onClick={() => { setStatusFilter(opt.value); setIsStatusDropdownOpen(false) }} className="w-full text-left px-2 py-1.5 text-xs transition-colors" style={{ color: '#1F271B', backgroundColor: statusFilter === opt.value ? '#F3F4F6' : 'white' }} onMouseEnter={(e) => { if (statusFilter !== opt.value) e.currentTarget.style.backgroundColor = '#F9FAFB' }} onMouseLeave={(e) => { if (statusFilter !== opt.value) e.currentTarget.style.backgroundColor = 'white' }}>{opt.label}</button>
                     </span>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Search Bar */}
+            {/* Search */}
             <div className="relative flex-1 sm:flex-initial">
               <FiSearch className="absolute left-2.5 top-1/2 transform -translate-y-1/2" size={14} style={{ color: '#1F271B', opacity: 0.5 }} />
-              <input
-                type="text"
-                placeholder="Search by invoice ID or client..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-56 pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none transition-all shadow-sm hover:shadow-md"
-                style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#28AFB0'
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED'
-                  e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#D1D5DB'
-                }}
-                onMouseLeave={(e) => {
-                  if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#EAEBED'
-                }}
-              />
+              <input type="text" placeholder="Search by invoice ID or client..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-56 pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none transition-all shadow-sm hover:shadow-md" style={{ borderColor: '#EAEBED', color: '#1F271B' }} onFocus={(e) => { e.currentTarget.style.borderColor = '#28AFB0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)' }} onBlur={(e) => { e.currentTarget.style.borderColor = '#EAEBED'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }} onMouseEnter={(e) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#D1D5DB' }} onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#EAEBED' }} />
             </div>
           </div>
         </div>
@@ -358,32 +259,20 @@ export function AdminInvoices() {
                       key={invoice.id}
                       className="border-t cursor-pointer transition-colors"
                       style={{ borderColor: '#EAEBED' }}
+                      onClick={() => router.push(`/admin/invoices/${invoice.id}`)}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB' }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}
                     >
+                      <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.id}</p></td>
+                      <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{invoice.business}</p></td>
+                      <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.client}</p></td>
+                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${invoice.amount.toLocaleString()}</p></td>
                       <td className="px-3 py-2">
-                        <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.id}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{invoice.business}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.client}</p>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${invoice.amount.toLocaleString()}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium"
-                          style={{ backgroundColor: color.bg, color: color.text }}
-                        >
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium" style={{ backgroundColor: color.bg, color: color.text }}>
                           {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{invoice.dueDate}</p>
-                      </td>
+                      <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{invoice.dueDate}</p></td>
                     </tr>
                   )
                 })}

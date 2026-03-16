@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { FiSearch, FiChevronDown } from "react-icons/fi";
 
 const mockJobs = [
@@ -32,7 +33,6 @@ const getStatusColor = (status: JobStatus) => {
 };
 
 const uniqueBusinesses = Array.from(new Set(mockJobs.map(j => j.business)));
-
 const statusOptions = ['active', 'completed', 'pending', 'cancelled'];
 
 const jobStats = {
@@ -43,6 +43,7 @@ const jobStats = {
 };
 
 export function Workorders() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [businessFilter, setBusinessFilter] = useState("all");
@@ -93,7 +94,6 @@ export function Workorders() {
 
       {/* Overview Blocks */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        {/* Active */}
         <div
           className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
@@ -105,28 +105,17 @@ export function Workorders() {
             <div className="flex justify-between items-start mb-1.5">
               <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Active Workorders</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
-              className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
-              style={{ backgroundColor: statusFilter === 'active' ? 'rgba(43, 80, 170, 0.12)' : 'transparent' }}
-            >
+            <button type="button" onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')} className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors" style={{ backgroundColor: statusFilter === 'active' ? 'rgba(43, 80, 170, 0.12)' : 'transparent' }}>
               <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Active</span>
               <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats.active}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
-              className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
-              style={{ backgroundColor: statusFilter === 'pending' ? 'rgba(176, 132, 204, 0.15)' : 'transparent' }}
-            >
+            <button type="button" onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')} className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors" style={{ backgroundColor: statusFilter === 'pending' ? 'rgba(176, 132, 204, 0.15)' : 'transparent' }}>
               <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Pending</span>
               <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats.pending}</span>
             </button>
           </div>
         </div>
 
-        {/* Completed */}
         <div
           className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
@@ -138,19 +127,13 @@ export function Workorders() {
             <div className="flex justify-between items-start mb-1.5">
               <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Completed Workorders</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
-              className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
-              style={{ backgroundColor: statusFilter === 'completed' ? 'rgba(40, 175, 176, 0.12)' : 'transparent' }}
-            >
+            <button type="button" onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')} className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors" style={{ backgroundColor: statusFilter === 'completed' ? 'rgba(40, 175, 176, 0.12)' : 'transparent' }}>
               <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Completed</span>
               <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats.completed}</span>
             </button>
           </div>
         </div>
 
-        {/* Cancelled */}
         <div
           className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
@@ -162,19 +145,13 @@ export function Workorders() {
             <div className="flex justify-between items-start mb-1.5">
               <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Cancelled Workorders</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === 'cancelled' ? 'all' : 'cancelled')}
-              className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors"
-              style={{ backgroundColor: statusFilter === 'cancelled' ? 'rgba(239, 68, 68, 0.12)' : 'transparent' }}
-            >
+            <button type="button" onClick={() => setStatusFilter(statusFilter === 'cancelled' ? 'all' : 'cancelled')} className="w-full flex items-center justify-between py-0.5 px-1 -mx-1 rounded text-left hover:bg-black/5 transition-colors" style={{ backgroundColor: statusFilter === 'cancelled' ? 'rgba(239, 68, 68, 0.12)' : 'transparent' }}>
               <span className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>Cancelled</span>
               <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{jobStats.cancelled}</span>
             </button>
           </div>
         </div>
 
-        {/* Total Value */}
         <div
           className="rounded shadow-sm border overflow-hidden transition-all hover:shadow-md"
           style={{ backgroundColor: '#F3F4F6', borderColor: '#EAEBED' }}
@@ -202,12 +179,7 @@ export function Workorders() {
           </h2>
           <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end flex-wrap">
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-xs font-medium hover:underline px-1"
-                style={{ color: '#28AFB0' }}
-              >
+              <button type="button" onClick={clearAllFilters} className="text-xs font-medium hover:underline px-1" style={{ color: '#28AFB0' }}>
                 Clear filters
               </button>
             )}
@@ -217,19 +189,7 @@ export function Workorders() {
               <button
                 onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)}
                 className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-                style={{
-                  backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white',
-                  borderColor: '#EAEBED',
-                  color: '#1F271B',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#D1D5DB';
-                  if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED';
-                  if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                }}
+                style={{ backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white', borderColor: '#EAEBED', color: '#1F271B' }}
               >
                 <span className="font-semibold" style={{ color: '#1F271B' }}>Business</span>
                 <span style={{ color: '#1F271B', opacity: 0.5 }}>|</span>
@@ -238,27 +198,11 @@ export function Workorders() {
               </button>
               {isBusinessDropdownOpen && (
                 <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[200px] py-1" style={{ borderColor: '#EAEBED' }}>
-                  <button
-                    onClick={() => { setBusinessFilter('all'); setIsBusinessDropdownOpen(false); }}
-                    className="w-full text-left px-2 py-1.5 text-[10px] transition-colors"
-                    style={{ color: '#1F271B', backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white' }}
-                    onMouseEnter={(e) => { if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                    onMouseLeave={(e) => { if (businessFilter !== 'all') e.currentTarget.style.backgroundColor = 'white'; }}
-                  >
-                    All
-                  </button>
+                  <button onClick={() => { setBusinessFilter('all'); setIsBusinessDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 text-[10px] transition-colors" style={{ color: '#1F271B', backgroundColor: businessFilter === 'all' ? '#F3F4F6' : 'white' }}>All</button>
                   {uniqueBusinesses.map((biz) => (
                     <span key={biz}>
                       <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
-                      <button
-                        onClick={() => { setBusinessFilter(biz); setIsBusinessDropdownOpen(false); }}
-                        className="w-full text-left px-2 py-1.5 text-[10px] transition-colors"
-                        style={{ color: '#1F271B', backgroundColor: businessFilter === biz ? '#F3F4F6' : 'white' }}
-                        onMouseEnter={(e) => { if (businessFilter !== biz) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                        onMouseLeave={(e) => { if (businessFilter !== biz) e.currentTarget.style.backgroundColor = 'white'; }}
-                      >
-                        {biz}
-                      </button>
+                      <button onClick={() => { setBusinessFilter(biz); setIsBusinessDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 text-[10px] transition-colors" style={{ color: '#1F271B', backgroundColor: businessFilter === biz ? '#F3F4F6' : 'white' }}>{biz}</button>
                     </span>
                   ))}
                 </div>
@@ -270,19 +214,7 @@ export function Workorders() {
               <button
                 onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
                 className="px-2.5 py-1.5 rounded border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm hover:shadow-md"
-                style={{
-                  backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white',
-                  borderColor: '#EAEBED',
-                  color: '#1F271B',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#D1D5DB';
-                  if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED';
-                  if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                }}
+                style={{ backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white', borderColor: '#EAEBED', color: '#1F271B' }}
               >
                 <span className="font-semibold" style={{ color: '#1F271B' }}>Status</span>
                 <span style={{ color: '#1F271B', opacity: 0.5 }}>|</span>
@@ -291,27 +223,11 @@ export function Workorders() {
               </button>
               {isStatusDropdownOpen && (
                 <div className="absolute right-0 mt-1 bg-white rounded shadow-lg border z-10 min-w-[180px] py-1" style={{ borderColor: '#EAEBED' }}>
-                  <button
-                    onClick={() => { setStatusFilter('all'); setIsStatusDropdownOpen(false); }}
-                    className="w-full text-left px-2 py-1.5 text-[10px] transition-colors"
-                    style={{ color: '#1F271B', backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white' }}
-                    onMouseEnter={(e) => { if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                    onMouseLeave={(e) => { if (statusFilter !== 'all') e.currentTarget.style.backgroundColor = 'white'; }}
-                  >
-                    All
-                  </button>
+                  <button onClick={() => { setStatusFilter('all'); setIsStatusDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 text-[10px] transition-colors" style={{ color: '#1F271B', backgroundColor: statusFilter === 'all' ? '#F3F4F6' : 'white' }}>All</button>
                   {statusOptions.map((status) => (
                     <span key={status}>
                       <div className="mx-2 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
-                      <button
-                        onClick={() => { setStatusFilter(status); setIsStatusDropdownOpen(false); }}
-                        className="w-full text-left px-2 py-1.5 text-[10px] transition-colors"
-                        style={{ color: '#1F271B', backgroundColor: statusFilter === status ? '#F3F4F6' : 'white' }}
-                        onMouseEnter={(e) => { if (statusFilter !== status) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                        onMouseLeave={(e) => { if (statusFilter !== status) e.currentTarget.style.backgroundColor = 'white'; }}
-                      >
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </button>
+                      <button onClick={() => { setStatusFilter(status); setIsStatusDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 text-[10px] transition-colors" style={{ color: '#1F271B', backgroundColor: statusFilter === status ? '#F3F4F6' : 'white' }}>{status.charAt(0).toUpperCase() + status.slice(1)}</button>
                     </span>
                   ))}
                 </div>
@@ -326,22 +242,10 @@ export function Workorders() {
                 placeholder="Search workorders..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-56 pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none transition-all shadow-sm hover:shadow-md"
+                className="w-full sm:w-56 pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none transition-all shadow-sm"
                 style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#28AFB0';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#EAEBED';
-                  e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-                onMouseEnter={(e) => {
-                  if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#D1D5DB';
-                }}
-                onMouseLeave={(e) => {
-                  if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderColor = '#EAEBED';
-                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#28AFB0'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(40, 175, 176, 0.1)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#EAEBED'; e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)'; }}
               />
             </div>
           </div>
@@ -363,9 +267,7 @@ export function Workorders() {
             <tbody>
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>
-                    No workorders found
-                  </td>
+                  <td colSpan={6} className="px-3 py-4 text-center text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>No workorders found</td>
                 </tr>
               ) : (
                 filteredJobs.map((job) => {
@@ -375,32 +277,20 @@ export function Workorders() {
                       key={job.id}
                       className="border-t cursor-pointer transition-colors"
                       style={{ borderColor: '#EAEBED' }}
+                      onClick={() => router.push(`/admin/workorders/${job.id}`)}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
                     >
+                      <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{job.id}</p></td>
+                      <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{job.business}</p></td>
+                      <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{job.client}</p></td>
                       <td className="px-3 py-2">
-                        <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{job.id}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{job.business}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{job.client}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium"
-                          style={{ backgroundColor: color.bg, color: color.text }}
-                        >
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium" style={{ backgroundColor: color.bg, color: color.text }}>
                           {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
-                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${job.amount.toLocaleString()}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{job.createdDate}</p>
-                      </td>
+                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${job.amount.toLocaleString()}</p></td>
+                      <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{job.createdDate}</p></td>
                     </tr>
                   );
                 })

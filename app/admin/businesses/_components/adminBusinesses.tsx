@@ -4,6 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Eye, UserCheck, Ban, Building2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type BusinessItem = {
   id: string;
@@ -148,7 +154,7 @@ export default function AdminBusinessesList() {
               key={business.id}
               role="button"
               tabIndex={0}
-              onClick={() => router.push(`/businesses/${business.id}`)}
+              onClick={() => router.push(`/admin/businesses/${business.id}`)}
               className="p-4 hover:bg-neutral-light/50 cursor-pointer active:bg-neutral-light/70"
             >
               <div className="flex justify-between items-start mb-2">
@@ -184,92 +190,115 @@ export default function AdminBusinessesList() {
 
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-neutral-light">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                  Company Name
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                  Total Jobs
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                  Revenue
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                  Users
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                  Last Login
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBusinesses.map((business) => (
-                <tr
-                  key={business.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => router.push(`/businesses/${business.id}`)}
-                  className="border-b border-neutral-light hover:bg-neutral-light/50 cursor-pointer"
-                >
-                  <td className="px-4 py-3 text-sm font-medium text-neutral-dark">
-                    {business.companyName}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-neutral-dark/70">
-                    {business.email}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyle(business.status)}`}
-                    >
-                      {business.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                    {business.totalJobs}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                    ${business.revenue.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                    {business.usersCount}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-neutral-dark/70">
-                    {business.lastLogin}
-                  </td>
-                  <td
-                    className="px-4 py-3"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/businesses/${business.id}`}
-                        className="p-2 rounded hover:bg-neutral-light"
-                      >
-                        <Eye size={16} />
-                      </Link>
-                      <button className="p-2 rounded hover:bg-neutral-light">
-                        <UserCheck size={16} />
-                      </button>
-                      <button className="p-2 rounded hover:bg-neutral-light">
-                        <Ban size={16} />
-                      </button>
-                    </div>
-                  </td>
+          <TooltipProvider>
+            <table className="w-full">
+              <thead className="bg-neutral-light">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
+                    Company Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
+                    Total Jobs
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
+                    Revenue
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
+                    Users
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
+                    Last Login
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredBusinesses.map((business) => (
+                  <tr
+                    key={business.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      router.push(`/admin/businesses/${business.id}`)
+                    }
+                    className="border-b border-neutral-light hover:bg-neutral-light/50 cursor-pointer"
+                  >
+                    <td className="px-4 py-3 text-sm font-medium text-neutral-dark">
+                      {business.companyName}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-neutral-dark/70">
+                      {business.email}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyle(
+                          business.status
+                        )}`}
+                      >
+                        {business.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
+                      {business.totalJobs}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
+                      ${business.revenue.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
+                      {business.usersCount}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-neutral-dark/70">
+                      {business.lastLogin}
+                    </td>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link
+                              href={`/admin/businesses/${business.id}`}
+                              className="p-2 rounded hover:bg-neutral-light"
+                            >
+                              <Eye size={16} />
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-blue-600 bg-blue-50">View Details</TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="p-2 rounded hover:bg-neutral-light">
+                              <UserCheck size={16} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-green-600 bg-green-50">Activate</TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="p-2 rounded hover:bg-neutral-light">
+                              <Ban size={16} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-red-600 bg-red-50">Suspend</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TooltipProvider>
         </div>
       </div>
     </div>

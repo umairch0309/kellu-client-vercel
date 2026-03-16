@@ -5,27 +5,36 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiMail, FiLock, FiLogIn } from 'react-icons/fi'
+import { authClient } from '@/lib/auth-client' // 👈 ADD THIS
 
-const CREDENTIALS = [
-  { email: 'admin@kellu.com', password: 'password123', route: '/admin' },
-  { email: 'user@kellu.com',  password: 'user123',     route: '/' },
-]
+// 👇 REMOVE the entire CREDENTIALS array
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false) // 👈 ADD THIS
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => { // 👈 make async
     e.preventDefault()
-    const match = CREDENTIALS.find(c => c.email === email && c.password === password)
-    if (match) {
-      localStorage.setItem('isLoggedIn', 'true')
-      router.push(match.route)
-    } else {
-      setError('Invalid email or password.')
+    setIsLoading(true)  // 👈 ADD
+    setError('')         // 👈 ADD (clear previous errors)
+
+    const { data, error } = await authClient.signIn.email({  // 👈 REPLACE old logic
+      email,
+      password,
+    })
+
+    if (error) {
+      setError(error.message ?? 'Invalid email or password.')
+      setIsLoading(false)
+      return
     }
+
+    // Redirect based on user role returned from backend
+    const role = data?.user?.role  // adjust this field to match your backend's response
+    router.push(role === 'admin' ? '/admin' : '/')
   }
 
   return (
@@ -92,7 +101,7 @@ export default function LoginPage() {
                 />
               </div>
               <div className="mt-2 text-right">
-                <Link href="/login/forgot-password" className="text-sm font-medium" style={{ color: '#2B50AA' }}>
+                <Link href="/login/forgot-password" className="text-sm font-medium" style={{ color: '#28AFB0' }}>
                   Forgot Password?
                 </Link>
               </div>
@@ -101,30 +110,22 @@ export default function LoginPage() {
             {/* Login Button */}
             <button
               type="submit"
-              className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#2B50AA', color: '#ffffff' }}
+              disabled={isLoading} // 👈 ADD
+              className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed" // 👈 add disabled styles
+              style={{ backgroundColor: '#28AFB0', color: '#ffffff' }}
             >
               <FiLogIn size={18} />
-              Sign In
+              {isLoading ? 'Signing in...' : 'Sign In'} {/* 👈 ADD */}
             </button>
           </form>
 
-          {/* Credentials Hint */}
-          <div className="mt-6 p-4 bg-neutral-light rounded-lg space-y-3">
-            <p className="text-xs text-neutral-dark/70 font-semibold">Demo Credentials:</p>
-
-            <div>
-              <p className="text-xs text-neutral-dark/50 font-semibold uppercase tracking-wide mb-1">Admin → <span className="font-mono normal-case">/admin</span></p>
-              <p className="text-xs text-neutral-dark/70">Email: <span className="font-mono font-semibold">admin@kellu.com</span></p>
-              <p className="text-xs text-neutral-dark/70">Password: <span className="font-mono font-semibold">password123</span></p>
-            </div>
-
-            <div>
-              <p className="text-xs text-neutral-dark/50 font-semibold uppercase tracking-wide mb-1">User → <span className="font-mono normal-case">/</span></p>
-              <p className="text-xs text-neutral-dark/70">Email: <span className="font-mono font-semibold">user@kellu.com</span></p>
-              <p className="text-xs text-neutral-dark/70">Password: <span className="font-mono font-semibold">user123</span></p>
-            </div>
-          </div>
+          {/* Sign Up Link */}
+          <p className="mt-6 text-center text-sm text-neutral-dark/70">
+            Don&apos;t have an account?{' '}
+            <Link href="/login/signup" className="font-semibold hover:underline" style={{ color: '#28AFB0' }}>
+              Create one
+            </Link>
+          </p>
         </div>
       </div>
     </div>
