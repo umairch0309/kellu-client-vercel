@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ClientProviders from "@/app/clients/_components/ClientProviders";
-import { SessionProvider } from "@/components/providers/session-provider";
 
 export const metadata: Metadata = {
   title: "Kellu - Business Management Platform",
@@ -27,9 +26,7 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        <SessionProvider>
           <ClientProviders>{children}</ClientProviders>
-        </SessionProvider>
       </body>
     </html>
   );

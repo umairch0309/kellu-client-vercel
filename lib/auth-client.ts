@@ -1,12 +1,12 @@
 import { createAuthClient } from "better-auth/react";
+import { adminClient } from "better-auth/client/plugins";
 
-console.log("Backend URL:", process.env.NEXT_PUBLIC_BACKEND_URL);
 export const authClient = createAuthClient({
-  baseURL: "http://localhost:8000", // points to your backend
+  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
   fetchOptions: {
-    credentials: "include", // CRITICAL for cross-origin cookies
+    credentials: "include",
   },
+  plugins: [adminClient()],
 });
 
-// Named exports for convenience
 export const { signIn, signOut, signUp, useSession } = authClient;

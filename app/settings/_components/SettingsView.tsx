@@ -18,24 +18,11 @@ const SIDEBAR_ITEMS: { id: SettingsSection; label: string }[] = [
 
 export type RoleDef = { id: string; name: string; description: string; permissions: string[]; isSystem: boolean }
 
-const SYSTEM_PERMISSION_OPTIONS = [
-  { id: 'all', label: 'Full access (all modules and configuration)' },
-  { id: 'clients', label: 'Clients' },
-  { id: 'workorders', label: 'Work orders' },
-  { id: 'quotes', label: 'Quotes' },
-  { id: 'invoices', label: 'Invoices' },
-  { id: 'schedule', label: 'Schedule' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'assigned_jobs', label: 'Access only to assigned jobs' },
-  { id: 'update_status', label: 'Update job/visit status' },
-  { id: 'work_reports', label: 'Submit work reports' },
-]
-
-const INITIAL_ROLES: RoleDef[] = [
-  { id: 'super-admin', name: 'Super Admin (me)', description: 'Full system control.', permissions: ['all'], isSystem: true },
-  { id: 'admin', name: 'Admin / Owner (Service company)', description: 'Full access to all modules and configuration.', permissions: ['all'], isSystem: true },
-  { id: 'technician', name: 'Technician', description: 'Access only to assigned jobs. Can update job/visit status and submit work reports.', permissions: ['assigned_jobs', 'update_status', 'work_reports'], isSystem: true },
-]
+// Matches the shape of each item in /api/roles/permissions/matrix data[]
+type PermissionResource = {
+  resource: string
+  actions: string[]
+}
 
 const inputClass = 'w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2'
 const labelClass = 'block text-sm font-medium mb-1'
@@ -56,7 +43,6 @@ export default function SettingsView() {
   const searchParams = useSearchParams()
   const sectionFromUrl = searchParams.get('section') as SettingsSection | null
   const [activeSection, setActiveSection] = useState<SettingsSection>('company')
-  const [roles, setRoles] = useState<RoleDef[]>(() => [...INITIAL_ROLES])
 
   useEffect(() => {
     if (sectionFromUrl && VALID_SECTIONS.includes(sectionFromUrl)) {
@@ -66,7 +52,7 @@ export default function SettingsView() {
 
   return (
     <div className="flex gap-6 min-h-[calc(100vh-8rem)]">
-      {/* Left sidebar - matches reference */}
+      {/* Left sidebar */}
       <aside className="w-56 shrink-0 border-r bg-white overflow-hidden" style={{ borderColor: '#EAEBED' }}>
         <div className="p-4 border-b" style={{ borderColor: '#EAEBED' }}>
           <h2 className="text-xl font-bold" style={{ color: '#1F271B' }}>Settings</h2>
@@ -96,18 +82,9 @@ export default function SettingsView() {
         {activeSection === 'schedule' && <ScheduleSettings />}
         {activeSection === 'products' && <ServicesSettings />}
         {activeSection === 'communications' && <CommunicationsSettings />}
-        {activeSection === 'team' && <TeamSettings roleOptions={roles.filter((r) => r.id !== 'super-admin').map((r) => r.name)} />}
-        {activeSection === 'roles' && <RolesPermissionsSettings roles={roles} setRoles={setRoles} />}
+        {activeSection === 'team' && <TeamSettings roleOptions={['Admin / Owner (Service company)', 'Technician']} />}
+        {activeSection === 'roles' && <RolesPermissionsSettings />}
       </main>
-    </div>
-  )
-}
-
-function PlaceholderSection({ name }: { name: string }) {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>{name}</h1>
-      <p className="text-sm" style={{ color: '#1F271B', opacity: 0.7 }}>This section is under construction.</p>
     </div>
   )
 }
@@ -584,23 +561,11 @@ function TemplateEditModal({ templateId, templateName, onClose }: { templateId: 
           <p className="text-sm font-medium mb-2" style={{ color: '#1F271B' }}>Notification method</p>
           <div className="flex gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.checked)}
-                className="w-4 h-4 rounded"
-                style={{ accentColor: '#28AFB0' }}
-              />
+              <input type="checkbox" checked={notifyEmail} onChange={(e) => setNotifyEmail(e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
               <span className="text-sm" style={{ color: '#1F271B' }}>Email</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyWhatsApp}
-                onChange={(e) => setNotifyWhatsApp(e.target.checked)}
-                className="w-4 h-4 rounded"
-                style={{ accentColor: '#28AFB0' }}
-              />
+              <input type="checkbox" checked={notifyWhatsApp} onChange={(e) => setNotifyWhatsApp(e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#28AFB0' }} />
               <span className="text-sm" style={{ color: '#1F271B' }}>WhatsApp</span>
             </label>
           </div>
@@ -909,7 +874,6 @@ function CompanySettings() {
     <div className="space-y-6 pb-8">
       <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Company settings</h1>
 
-      {/* Reply list – send email replies to (client email communication) */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Reply list</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Email addresses that receive replies from client email communication.</p>
@@ -919,12 +883,10 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Comment: Jobber reference */}
       <p className="text-xs italic" style={{ color: '#1F271B', opacity: 0.6 }}>
         See company and Business profile settings in Jobber for reference.
       </p>
 
-      {/* Due dates of Quote and Invoice */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Due dates</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Default due dates for quote and invoice.</p>
@@ -941,7 +903,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Personal profile */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Personal profile</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Update your personal profile details.</p>
@@ -957,7 +918,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Company details – layout matching design inspiration */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company details</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Update company information used on quotes, invoices, and communications.</p>
@@ -1014,7 +974,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Company logo */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company logo</h2>
         <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Used in email messages and on PDFs (quote and invoice).</p>
@@ -1029,7 +988,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Company colors – 2 colors for document personalization */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Company colors</h2>
         <p className="text-sm mb-4" style={{ color: '#1F271B', opacity: 0.7 }}>Two colors for document personalization (quotes, invoices, PDFs).</p>
@@ -1047,7 +1005,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Bank details */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Bank details</h2>
         <div className="space-y-4">
@@ -1083,7 +1040,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Terms & conditions */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Terms & conditions</h2>
         <div className="space-y-4">
@@ -1098,7 +1054,6 @@ function CompanySettings() {
         </div>
       </section>
 
-      {/* Arrival window */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Arrival window</h2>
         <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Number of hours (1–4) added to the scheduled start time to define the arrival range shown to the customer. Used for booking confirmation.</p>
@@ -1116,14 +1071,12 @@ function CompanySettings() {
         </p>
       </section>
 
-      {/* WhatsApp sender */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>WhatsApp sender</h2>
         <p className="text-sm mb-3" style={{ color: '#1F271B', opacity: 0.7 }}>Company WhatsApp number used for automated messages.</p>
         <input type="text" placeholder="+56 9 1234 5678" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B', maxWidth: '400px' }} />
       </section>
 
-      {/* Tax */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Tax (VAT / IVA)</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1149,18 +1102,99 @@ function CompanySettings() {
   )
 }
 
-function RolesPermissionsSettings({ roles, setRoles }: { roles: RoleDef[]; setRoles: React.Dispatch<React.SetStateAction<RoleDef[]>> }) {
+function RolesPermissionsSettings() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<RoleDef | null>(null)
+  const [customRoles, setCustomRoles] = useState<RoleDef[]>([])
+
+  // ── API state ──────────────────────────────────────────────────────────────
+  const [permissionMatrix, setPermissionMatrix] = useState<PermissionResource[]>([])
+  const [matrixLoading, setMatrixLoading] = useState(true)
+  const [matrixError, setMatrixError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setMatrixLoading(true)
+    setMatrixError(null)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    fetch(`${baseUrl}/api/roles/permissions/matrix`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setPermissionMatrix(json.data)
+        } else {
+          throw new Error('Unexpected response shape')
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Failed to load permissions'
+        setMatrixError(msg)
+      })
+      .finally(() => setMatrixLoading(false))
+  }, [])
+
+  // Flatten matrix → permission options keyed as "resource:action" for the modal
+  const allPermissions = useMemo<{ id: string; label: string }[]>(() => {
+    const options: { id: string; label: string }[] = [
+      { id: 'all', label: 'Full access (all modules and configuration)' },
+    ]
+    permissionMatrix.forEach(({ resource, actions }) => {
+      actions.forEach((action) => {
+        options.push({ id: `${resource}:${action}`, label: `${resource} — ${action}` })
+      })
+    })
+    return options
+  }, [permissionMatrix])
+
+  // Each row in the Roles table is one PermissionResource from the API
+  // plus any custom roles the user has created locally
+  const tableRows = useMemo(() => {
+    const apiRows: RoleDef[] = permissionMatrix.map((item) => ({
+      id: item.resource,
+      name: item.resource.charAt(0).toUpperCase() + item.resource.slice(1),
+      description: `Manage ${item.resource}`,
+      permissions: item.actions.map((a) => `${item.resource}:${a}`),
+      isSystem: true,
+    }))
+    return [...apiRows, ...customRoles]
+  }, [permissionMatrix, customRoles])
 
   const handleSaveCustomRole = (name: string, description: string, permissions: string[]) => {
-    if (editingRole) {
-      setRoles((prev) => prev.map((r) => (r.id === editingRole.id ? { ...r, name, description, permissions } : r)))
+    if (editingRole && !editingRole.isSystem) {
+      setCustomRoles((prev) =>
+        prev.map((r) => (r.id === editingRole.id ? { ...r, name, description, permissions } : r))
+      )
     } else {
-      setRoles((prev) => [...prev, { id: `custom-${Date.now()}`, name, description, permissions, isSystem: false }])
+      setCustomRoles((prev) => [
+        ...prev,
+        { id: `custom-${Date.now()}`, name, description, permissions, isSystem: false },
+      ])
     }
     setAddModalOpen(false)
     setEditingRole(null)
+  }
+
+  const formatPermissions = (permissions: string[]): string => {
+    if (permissions.includes('all')) return 'Full access'
+    const grouped: Record<string, string[]> = {}
+    permissions.forEach((p) => {
+      const [resource, action] = p.split(':')
+      if (resource && action) {
+        if (!grouped[resource]) grouped[resource] = []
+        grouped[resource].push(action)
+      }
+    })
+    return (
+      Object.entries(grouped)
+        .map(([res, acts]) => `${res}: ${acts.join(', ')}`)
+        .join(' | ') || '—'
+    )
   }
 
   return (
@@ -1168,68 +1202,110 @@ function RolesPermissionsSettings({ roles, setRoles }: { roles: RoleDef[]; setRo
       <div>
         <h1 className="text-2xl font-bold" style={{ color: '#1F271B' }}>Roles & Permissions</h1>
         <p className="text-sm mt-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-          System-wide permissions are predefined. Business owners can create custom roles and assign specific permissions to roles. The assigned role may see the portal in a different design view.
+          System-wide permissions are predefined. Business owners can create custom roles and assign specific
+          permissions to roles. The assigned role may see the portal in a different design view.
         </p>
       </div>
 
+      {/* Minimum required roles */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Minimum required roles</h2>
-        <ul className="space-y-2 text-sm mb-4" style={{ color: '#1F271B', opacity: 0.85 }}>
-          <li><strong>Admin / Owner (Service company)</strong> — Full access to all modules and configuration.</li>
-          <li><strong>Technician</strong> — Access only to assigned jobs; can update job/visit status and submit work reports.</li>
+        <ul className="space-y-2 text-sm" style={{ color: '#1F271B', opacity: 0.85 }}>
+          <li>
+            <strong>Admin / Owner (Service company)</strong> — Full access to all modules and configuration.
+          </li>
+          <li>
+            <strong>Technician</strong> — Access only to assigned jobs; can update job/visit status and submit
+            work reports.
+          </li>
         </ul>
       </section>
 
+      {/* Roles table — rows driven by /api/roles/permissions/matrix */}
       <section className="bg-white rounded-lg border p-6" style={{ borderColor: '#EAEBED' }}>
         <div className="flex justify-between items-center mb-4">
           <h2 className={sectionTitleClass} style={{ color: '#1F271B' }}>Roles</h2>
           <button
             type="button"
             onClick={() => { setEditingRole(null); setAddModalOpen(true) }}
-            className="px-4 py-2 rounded text-sm font-medium text-white flex items-center gap-2"
+            disabled={matrixLoading}
+            className="px-4 py-2 rounded text-sm font-medium text-white flex items-center gap-2 disabled:opacity-50"
             style={{ backgroundColor: '#28AFB0' }}
           >
             <FiPlus size={18} />
             Create custom role
           </button>
         </div>
-        <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#EAEBED' }}>
-          <table className="w-full">
-            <thead style={{ backgroundColor: '#F3F4F6' }}>
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Role</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Description</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Permissions</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold w-24" style={{ color: '#1F271B' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roles.filter((r) => r.id !== 'super-admin').map((r) => (
-                <tr key={r.id} className="border-b" style={{ borderColor: '#EAEBED' }}>
-                  <td className="px-4 py-3">
-                    <span className="font-medium" style={{ color: '#1F271B' }}>{r.name}</span>
-                    {r.isSystem && <span className="ml-2 text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>(system)</span>}
-                  </td>
-                  <td className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.8 }}>{r.description}</td>
-                  <td className="px-4 py-3 text-xs" style={{ color: '#1F271B', opacity: 0.8 }}>
-                    {r.permissions.includes('all') ? 'Full access' : r.permissions.join(', ')}
-                  </td>
-                  <td className="px-4 py-3">
-                    {!r.isSystem && (
-                      <button type="button" onClick={() => { setEditingRole(r); setAddModalOpen(true) }} className="text-sm font-medium" style={{ color: '#28AFB0' }}>Edit</button>
-                    )}
-                  </td>
+
+        {matrixLoading && (
+          <div className="flex items-center gap-2 py-6">
+            <div
+              className="w-4 h-4 border-2 rounded-full animate-spin"
+              style={{ borderColor: '#28AFB0', borderTopColor: 'transparent' }}
+            />
+            <span className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>Loading roles…</span>
+          </div>
+        )}
+
+        {!matrixLoading && matrixError && (
+          <div className="rounded-lg p-3" style={{ backgroundColor: '#FEF2F2' }}>
+            <p className="text-sm" style={{ color: '#DC2626' }}>Failed to load roles: {matrixError}</p>
+          </div>
+        )}
+
+        {!matrixLoading && !matrixError && (
+          <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#EAEBED' }}>
+            <table className="w-full">
+              <thead style={{ backgroundColor: '#F3F4F6' }}>
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Role</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Description</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold" style={{ color: '#1F271B' }}>Permissions</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold w-24" style={{ color: '#1F271B' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {tableRows.map((r) => (
+                  <tr key={r.id} className="border-b" style={{ borderColor: '#EAEBED' }}>
+                    <td className="px-4 py-3">
+                      <span className="font-medium" style={{ color: '#1F271B' }}>{r.name}</span>
+                      {r.isSystem && (
+                        <span className="ml-2 text-xs" style={{ color: '#1F271B', opacity: 0.5 }}>(system)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.8 }}>{r.description}</td>
+                    <td
+                      className="px-4 py-3 text-xs max-w-xs truncate"
+                      style={{ color: '#1F271B', opacity: 0.8 }}
+                      title={formatPermissions(r.permissions)}
+                    >
+                      {formatPermissions(r.permissions)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {!r.isSystem && (
+                        <button
+                          type="button"
+                          onClick={() => { setEditingRole(r); setAddModalOpen(true) }}
+                          className="text-sm font-medium"
+                          style={{ color: '#28AFB0' }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {addModalOpen && (
         <AddEditRoleModal
           role={editingRole}
-          allPermissions={SYSTEM_PERMISSION_OPTIONS}
+          allPermissions={allPermissions}
+          permissionMatrix={permissionMatrix}
           onClose={() => { setAddModalOpen(false); setEditingRole(null) }}
           onSave={handleSaveCustomRole}
         />
@@ -1241,11 +1317,13 @@ function RolesPermissionsSettings({ roles, setRoles }: { roles: RoleDef[]; setRo
 function AddEditRoleModal({
   role,
   allPermissions,
+  permissionMatrix,
   onClose,
   onSave,
 }: {
   role: RoleDef | null
   allPermissions: { id: string; label: string }[]
+  permissionMatrix: PermissionResource[]
   onClose: () => void
   onSave: (name: string, description: string, permissions: string[]) => void
 }) {
@@ -1253,15 +1331,34 @@ function AddEditRoleModal({
   const [description, setDescription] = useState(role?.description ?? '')
   const [permissions, setPermissions] = useState<string[]>(role?.permissions ?? [])
 
-  const togglePermission = (id: string) => {
-    if (id === 'all') {
-      setPermissions((prev) => (prev.includes('all') ? [] : ['all']))
+  const isFullAccess = permissions.includes('all')
+
+  const toggleAll = () => {
+    setPermissions(isFullAccess ? [] : ['all'])
+  }
+
+  // Select / deselect every action in a resource
+  const toggleResourceAll = (resource: string, actions: string[]) => {
+    const keys = actions.map((a) => `${resource}:${a}`)
+    const allChecked = keys.every((k) => permissions.includes(k))
+    if (allChecked) {
+      setPermissions((prev) => prev.filter((p) => !keys.includes(p)))
     } else {
       setPermissions((prev) => {
-        const next = prev.filter((p) => p !== 'all')
-        return next.includes(id) ? next.filter((p) => p !== id) : [...next, id]
+        const withoutAll = prev.filter((p) => p !== 'all')
+        return Array.from(new Set([...withoutAll, ...keys]))
       })
     }
+  }
+
+  const togglePermission = (id: string) => {
+    if (id === 'all') { toggleAll(); return }
+    setPermissions((prev) => {
+      const withoutAll = prev.filter((p) => p !== 'all')
+      return withoutAll.includes(id)
+        ? withoutAll.filter((p) => p !== id)
+        : [...withoutAll, id]
+    })
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1272,42 +1369,169 @@ function AddEditRoleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" style={{ borderColor: '#EAEBED', border: '1px solid #EAEBED' }}>
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+        style={{ borderColor: '#EAEBED', border: '1px solid #EAEBED' }}
+      >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold" style={{ color: '#1F271B' }}>{role ? 'Edit role' : 'Create custom role'}</h3>
-          <button type="button" onClick={onClose} className="p-1.5 rounded hover:bg-gray-100" style={{ color: '#1F271B' }} aria-label="Close">
+          <h3 className="text-lg font-semibold" style={{ color: '#1F271B' }}>
+            {role ? 'Edit role' : 'Create custom role'}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-gray-100"
+            style={{ color: '#1F271B' }}
+            aria-label="Close"
+          >
             <FiX size={20} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Name */}
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Role name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Field worker" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="e.g. Field worker"
+              className={inputClass}
+              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+            />
           </div>
+
+          {/* Description */}
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Description</label>
-            <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this role can do" className={inputClass} style={{ borderColor: '#EAEBED', color: '#1F271B' }} />
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this role can do"
+              className={inputClass}
+              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+            />
           </div>
+
+          {/* Permissions */}
           <div>
             <label className={labelClass} style={{ color: '#1F271B' }}>Permissions</label>
-            <div className="space-y-2 border rounded-lg p-3" style={{ borderColor: '#EAEBED', maxHeight: 200, overflowY: 'auto' }}>
-              {allPermissions.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.includes(p.id)}
-                    onChange={() => togglePermission(p.id)}
-                    className="w-4 h-4 rounded"
-                    style={{ accentColor: '#28AFB0' }}
-                  />
-                  <span className="text-sm" style={{ color: '#1F271B' }}>{p.label}</span>
-                </label>
-              ))}
-            </div>
+
+            {/* Full access master toggle */}
+            <label
+              className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border mb-3"
+              style={{
+                borderColor: isFullAccess ? '#28AFB0' : '#EAEBED',
+                backgroundColor: isFullAccess ? 'rgba(40,175,176,0.07)' : 'transparent',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isFullAccess}
+                onChange={toggleAll}
+                className="w-4 h-4 rounded"
+                style={{ accentColor: '#28AFB0' }}
+              />
+              <span className="text-sm font-medium" style={{ color: '#1F271B' }}>
+                Full access (all modules and configuration)
+              </span>
+            </label>
+
+            {/* Grouped resource → action checkboxes (hidden when full-access is on) */}
+            {!isFullAccess && (
+              <div
+                className="border rounded-lg overflow-hidden"
+                style={{ borderColor: '#EAEBED', maxHeight: 340, overflowY: 'auto' }}
+              >
+                {permissionMatrix.length === 0 ? (
+                  <p className="px-4 py-3 text-sm" style={{ color: '#1F271B', opacity: 0.5 }}>
+                    No permission resources loaded.
+                  </p>
+                ) : (
+                  permissionMatrix.map(({ resource, actions }) => {
+                    const keys = actions.map((a) => `${resource}:${a}`)
+                    const allChecked = keys.every((k) => permissions.includes(k))
+                    const someChecked = keys.some((k) => permissions.includes(k))
+
+                    return (
+                      <div
+                        key={resource}
+                        className="border-b last:border-b-0"
+                        style={{ borderColor: '#EAEBED' }}
+                      >
+                        {/* Resource header with select-all */}
+                        <label
+                          className="flex items-center gap-2 px-4 py-2 cursor-pointer"
+                          style={{ backgroundColor: '#F9FAFB' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allChecked}
+                            ref={(el) => {
+                              if (el) el.indeterminate = !allChecked && someChecked
+                            }}
+                            onChange={() => toggleResourceAll(resource, actions)}
+                            className="w-4 h-4 rounded"
+                            style={{ accentColor: '#28AFB0' }}
+                          />
+                          <span
+                            className="text-sm font-semibold capitalize"
+                            style={{ color: '#1F271B' }}
+                          >
+                            {resource}
+                          </span>
+                        </label>
+
+                        {/* Individual action checkboxes */}
+                        <div className="px-5 pb-2.5 flex flex-wrap gap-x-5 gap-y-1">
+                          {actions.map((action) => {
+                            const key = `${resource}:${action}`
+                            return (
+                              <label
+                                key={key}
+                                className="flex items-center gap-1.5 cursor-pointer py-1"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={permissions.includes(key)}
+                                  onChange={() => togglePermission(key)}
+                                  className="w-3.5 h-3.5 rounded"
+                                  style={{ accentColor: '#28AFB0' }}
+                                />
+                                <span className="text-xs" style={{ color: '#1F271B' }}>
+                                  {action}
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
+
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 border rounded text-sm font-medium" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded text-sm font-medium text-white" style={{ backgroundColor: '#28AFB0' }}>{role ? 'Save' : 'Create role'}</button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded text-sm font-medium"
+              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded text-sm font-medium text-white"
+              style={{ backgroundColor: '#28AFB0' }}
+            >
+              {role ? 'Save' : 'Create role'}
+            </button>
           </div>
         </form>
       </div>
@@ -1613,24 +1837,12 @@ function ServicesSettings() {
 
   const toggleSort = (field: 'name' | 'type') => {
     if (sortBy === field) setSortAsc((a) => !a)
-    else {
-      setSortBy(field)
-      setSortAsc(true)
-    }
+    else { setSortBy(field); setSortAsc(true) }
   }
 
-  const openAdd = () => {
-    setEditingId(null)
-    setModalOpen(true)
-  }
-  const openEdit = (id: number) => {
-    setEditingId(id)
-    setModalOpen(true)
-  }
-  const closeModal = () => {
-    setModalOpen(false)
-    setEditingId(null)
-  }
+  const openAdd = () => { setEditingId(null); setModalOpen(true) }
+  const openEdit = (id: number) => { setEditingId(id); setModalOpen(true) }
+  const closeModal = () => { setModalOpen(false); setEditingId(null) }
 
   return (
     <div className="space-y-4 pb-8">
