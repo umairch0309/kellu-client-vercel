@@ -5,35 +5,50 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiMail, FiLock, FiLogIn } from 'react-icons/fi'
-import { authClient } from '@/lib/auth-client' // 👈 ADD THIS
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { authClient } from '@/lib/auth-client'
 
-// 👇 REMOVE the entire CREDENTIALS array
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .min(8, 'Password must be at least 8 characters'),
+})
+
+type LoginFormData = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false) // 👈 ADD THIS
+  const [serverError, setServerError] = useState('')
 
-  const handleLogin = async (e: React.FormEvent) => { // 👈 make async
-    e.preventDefault()
-    setIsLoading(true)  // 👈 ADD
-    setError('')         // 👈 ADD (clear previous errors)
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
 
-    const { data, error } = await authClient.signIn.email({  // 👈 REPLACE old logic
-      email,
-      password,
+  const onSubmit = async (formData: LoginFormData) => {
+    setServerError('')
+
+    const { data, error } = await authClient.signIn.email({
+      email: formData.email,
+      password: formData.password,
     })
 
     if (error) {
-      setError(error.message ?? 'Invalid email or password.')
-      setIsLoading(false)
+      setServerError(error.message ?? 'Invalid email or password.')
       return
     }
 
-    // Redirect based on user role returned from backend
-    const role = data?.user?.role  // adjust this field to match your backend's response
+    const role = data?.user?.role
     router.push(role === 'admin' ? '/admin' : '/')
   }
 
@@ -57,13 +72,13 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-neutral-dark mb-2">Welcome Back</h1>
           <p className="text-sm text-neutral-dark/70 mb-6">Sign in to your account</p>
 
-          {error && (
+          {serverError && (
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5' }}>
-              <p className="text-sm" style={{ color: '#dc2626' }}>{error}</p>
+              <p className="text-sm" style={{ color: '#dc2626' }}>{serverError}</p>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-neutral-dark mb-2">
@@ -74,13 +89,15 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full pl-10 pr-4 py-3 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
+                  className="w-full pl-10 pr-4 py-3 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary aria-[invalid=true]:border-red-400"
+                  aria-invalid={!!errors.email}
+                  {...register('email')}
                 />
               </div>
+              {errors.email && (
+                <p className="mt-1 text-xs" style={{ color: '#dc2626' }}>{errors.email.message}</p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -93,13 +110,15 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-4 py-3 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
+                  className="w-full pl-10 pr-4 py-3 border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary aria-[invalid=true]:border-red-400"
+                  aria-invalid={!!errors.password}
+                  {...register('password')}
                 />
               </div>
+              {errors.password && (
+                <p className="mt-1 text-xs" style={{ color: '#dc2626' }}>{errors.password.message}</p>
+              )}
               <div className="mt-2 text-right">
                 <Link href="/login/forgot-password" className="text-sm font-medium" style={{ color: '#28AFB0' }}>
                   Forgot Password?
@@ -110,12 +129,12 @@ export default function LoginPage() {
             {/* Login Button */}
             <button
               type="submit"
-              disabled={isLoading} // 👈 ADD
-              className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed" // 👈 add disabled styles
+              disabled={isSubmitting}
+              className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#28AFB0', color: '#ffffff' }}
             >
               <FiLogIn size={18} />
-              {isLoading ? 'Signing in...' : 'Sign In'} {/* 👈 ADD */}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
