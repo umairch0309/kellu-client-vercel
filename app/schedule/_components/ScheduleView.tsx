@@ -1,14 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { 
-  FiCalendar, 
-  FiChevronLeft, 
-  FiChevronRight, 
   FiX,
-  FiCheck,
   FiCheckCircle,
   FiCheckSquare,
   FiUsers,
@@ -18,8 +13,10 @@ import {
 import { format, startOfWeek, addDays, isToday, isSameDay, startOfDay, getHours, getMinutes, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, getDay, subMonths, addMonths } from 'date-fns'
 import { mockWorkorders, mockTeamMembers } from '@/data/mockData'
 import AddWorkorderModal from '../../clients/_components/AddWorkorderModal'
-
-type ScheduleItem = typeof mockWorkorders[0]
+import type { ScheduleItem } from './scheduleTypes'
+import EventDetailModal from './EventDetailModal'
+import UnscheduledSidebar from './UnscheduledSidebar'
+import CalendarControls from './CalendarControls'
 import AppSidebar from '../../../components/common/Sidebar'
 import Header from '../../../components/common/Header'
 
@@ -367,206 +364,12 @@ export default function ScheduleView() {
   }
   const filteredEventDetailTeam = activeTeamMembers.filter(m => m.name.toLowerCase().includes(eventDetailAssignSearchTerm.toLowerCase()))
 
-  const eventDetailModal = selectedItem && typeof document !== 'undefined' && createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true">
-      <div className="absolute inset-0 bg-black/25" onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm('') }} />
-      <div
-        className="relative bg-white rounded-lg shadow-2xl border w-full max-w-[320px] max-h-[85vh] overflow-hidden flex flex-col min-w-[280px]"
-        style={{ borderColor: '#EAEBED' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between p-2.5 border-b flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-bold mb-0.5 truncate" style={{ color: '#1F271B' }}>{selectedItem!.title}</h2>
-            <span className="inline-block px-1 py-0.5 text-xs rounded" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>
-              {(selectedItem as any).type === 'tasks' ? 'Task' : 'Workorder'}
-            </span>
-          </div>
-          <button onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm('') }} className="p-0.5 rounded transition-colors" style={{ color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}>
-            <FiX size={14} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2.5">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <input type="checkbox" id="event-detail-completed" className="w-3 h-3 rounded focus:ring-1" style={{ borderColor: '#EAEBED', accentColor: '#2B50AA' }} />
-            <label htmlFor="event-detail-completed" className="text-xs cursor-pointer" style={{ color: '#1F271B' }}>Completed</label>
-          </div>
-          {selectedItem!.schedule?.day && (
-            <div className="flex justify-end mb-1.5">
-              <div className="text-right">
-                <p className="text-sm font-medium" style={{ color: '#1F271B' }}>
-                  {format(new Date(selectedItem!.schedule.day), 'MMM d, yyyy')}
-                  {selectedItem!.schedule.startTime && ` ${selectedItem!.schedule.startTime}`}
-                </p>
-                <p className="text-sm font-medium mt-0.5" style={{ color: '#1F271B' }}>
-                  {eventDetailAssignedList.length > 0 ? `Assigned to ${eventDetailAssignedList.join(', ')}` : (selectedItem as any).assignedTeamMember ? `Assigned to ${(selectedItem as any).assignedTeamMember}` : 'Not assigned'}
-                </p>
-              </div>
-            </div>
-          )}
-          {selectedItem!.clientName && (
-            <div className="mb-1.5">
-              <p className="text-xs" style={{ color: '#1F271B' }}>
-                {(selectedItem as any).type === 'tasks' ? (
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/clients/${(selectedItem as any).clientId}`) }}
-                    className="underline hover:opacity-80 text-left"
-                    style={{ color: '#2B50AA' }}
-                  >
-                    {selectedItem!.clientName}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/clients/${(selectedItem as any).clientId}`) }}
-                      className="underline hover:opacity-80"
-                      style={{ color: '#2B50AA' }}
-                    >
-                      {selectedItem!.clientName}
-                    </button>
-                    {' / '}
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedItem(null); setSelectedItemPosition(undefined); router.push(`/workorders/${(selectedItem as any).id}`) }}
-                      className="underline hover:opacity-80"
-                      style={{ color: '#2B50AA' }}
-                    >
-                      #{selectedItem!.id}
-                    </button>
-                  </>
-                )}
-              </p>
-            </div>
-          )}
-          <div className="mb-1.5 relative">
-            <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>Team</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setIsEventDetailAssignOpen(prev => !prev) }}
-                className="w-3.5 h-3.5 rounded-full text-white flex items-center justify-center transition-colors flex-shrink-0"
-                style={{ backgroundColor: '#28AFB0' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0' }}
-              >
-                <FiPlus size={10} />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-0.5">
-              {eventDetailAssignedList.length > 0 ? (
-                eventDetailAssignedList.map((name: string) => (
-                  <span key={name} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                    {name}
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); updateWorkOrder(selectedItem!.id, { assignedTeamMember: eventDetailAssignedList.filter((n: string) => n !== name).join(', ') }) }}
-                      className="hover:opacity-70"
-                      aria-label={`Remove ${name}`}
-                    >
-                      <FiX size={8} />
-                    </button>
-                  </span>
-                ))
-              ) : (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full" style={{ backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                  All team members
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); eventDetailAssignClear() }}
-                    className="hover:opacity-70"
-                    aria-label="Clear"
-                  >
-                    <FiX size={8} />
-                  </button>
-                </span>
-              )}
-            </div>
-            {isEventDetailAssignOpen && (
-              <div
-                className="absolute left-0 top-full mt-1 z-[101] bg-white border rounded shadow-xl min-w-[200px] max-w-[280px]"
-                style={{ borderColor: '#EAEBED' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
-                  <input
-                    type="text"
-                    placeholder="Search team"
-                    value={eventDetailAssignSearchTerm}
-                    onChange={(e) => setEventDetailAssignSearchTerm(e.target.value)}
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
-                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                  />
-                </div>
-                <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                  <span className="text-xs font-medium" style={{ color: '#1F271B' }}>{eventDetailAssignedList.length} selected</span>
-                  <button
-                    type="button"
-                    onClick={() => eventDetailAssignedList.length === activeTeamMembers.length ? eventDetailAssignClear() : eventDetailAssignSelectAll()}
-                    className="text-xs font-medium underline"
-                    style={{ color: '#28AFB0' }}
-                  >
-                    {eventDetailAssignedList.length === activeTeamMembers.length ? 'Clear' : 'Select all'}
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto">
-                  {filteredEventDetailTeam.map((member) => {
-                    const isSelected = eventDetailAssignedList.includes(member.name)
-                    return (
-                      <div
-                        key={member.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => eventDetailAssignToggle(member.name)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); eventDetailAssignToggle(member.name) } }}
-                        className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
-                        style={{ backgroundColor: 'transparent' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                      >
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium flex-shrink-0" style={{ backgroundColor: '#E5E7EB', color: '#1F271B' }}>
-                          {member.name.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
-                        </span>
-                        <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{member.name}</span>
-                        {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="mb-1.5">
-            <p className="text-xs font-semibold mb-0.5" style={{ color: '#1F271B' }}>Address</p>
-            <p className="text-xs" style={{ color: '#1F271B', opacity: 0.9 }}>{(selectedItem as any).address || '—'}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-            <div>
-              <p className="text-xs mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>Start</p>
-              <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{format(new Date(selectedItem!.schedule!.day), 'MMM d, yyyy')}</p>
-              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{selectedItem!.schedule!.startTime}</p>
-            </div>
-            <div>
-              <p className="text-xs mb-0.5" style={{ color: '#1F271B', opacity: 0.7 }}>End</p>
-              <p className="text-xs font-medium" style={{ color: '#1F271B' }}>{format(new Date(selectedItem!.schedule!.day), 'MMM d, yyyy')}</p>
-              <p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{selectedItem!.schedule!.endTime}</p>
-            </div>
-          </div>
-          <div className="flex gap-1.5 pt-1.5 border-t flex-shrink-0" style={{ borderColor: '#EAEBED' }}>
-            <button onClick={() => { const id = selectedItem!.id; setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm(''); router.push(`/workorders/${id}/edit`) }} className="flex-1 px-2 py-1.5 bg-white border rounded transition-colors text-xs font-medium flex items-center justify-center gap-1 whitespace-nowrap" style={{ borderColor: '#EAEBED', color: '#1F271B' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white' }}>
-              <FiEdit size={10} />
-              Edit
-            </button>
-            <button onClick={() => { const id = selectedItem!.id; setSelectedItem(null); setSelectedItemPosition(undefined); setIsEventDetailAssignOpen(false); setEventDetailAssignSearchTerm(''); router.push(`/workorders/${id}`) }} className="flex-1 px-2 py-1.5 rounded transition-colors text-xs font-medium text-white shadow-sm hover:shadow-md whitespace-nowrap flex items-center justify-center gap-1" style={{ backgroundColor: '#28AFB0' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E8A8B'; e.currentTarget.style.transform = 'translateY(-1px)' }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#28AFB0'; e.currentTarget.style.transform = 'translateY(0)' }}>
-              View Details
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
+  const eventDetailOnClose = () => {
+    setSelectedItem(null)
+    setSelectedItemPosition(undefined)
+    setIsEventDetailAssignOpen(false)
+    setEventDetailAssignSearchTerm('')
+  }
 
   return (
     <>
@@ -591,468 +394,47 @@ export default function ScheduleView() {
           position={modalPosition}
       />
 
-      {/* Calendar Controls */}
-      <div className="bg-white border-b px-2 sm:px-3 py-2" style={{ borderColor: '#EAEBED' }}>
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-3">
-          {/* Left Side - Navigation */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Date Picker - First */}
-            <div className="flex items-center gap-1 relative" ref={datePickerRef}>
-              <button 
-                onClick={() => {
-                  setIsDatePickerOpen(!isDatePickerOpen)
-                  setDatePickerMonth(currentDate)
-                }}
-                className="px-2 py-1.5 text-base font-medium rounded flex items-center gap-1 transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                {format(currentDate, 'MMMM yyyy')}
-                <FiChevronRight size={12} className={`rotate-90 transition-transform ${isDatePickerOpen ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {/* Date Picker Pop-up */}
-              {isDatePickerOpen && (
-                <div className="fixed bg-white border border-neutral-light rounded-lg shadow-xl z-[100] w-[240px] p-2"
-                  style={(() => {
-                    if (typeof window === 'undefined') return {}
-                    const button = datePickerRef.current?.querySelector('button')
-                    if (!button) return {}
-                    const rect = button.getBoundingClientRect()
-                    const pickerHeight = 260
-                    const pickerWidth = 240
-                    const padding = 10
-                    
-                    let top = rect.top - pickerHeight - padding
-                    let left = rect.left
-                    
-                    if (top < padding) {
-                      top = rect.bottom + padding
-                    }
-                    if (left + pickerWidth > window.innerWidth - padding) {
-                      left = window.innerWidth - pickerWidth - padding
-                    }
-                    if (left < padding) {
-                      left = padding
-                    }
-                    
-                    return {
-                      top: `${top}px`,
-                      left: `${left}px`,
-                    }
-                  })()}
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <button
-                      onClick={() => setDatePickerMonth(subMonths(datePickerMonth, 1))}
-                      className="p-0.5 hover:bg-neutral-light rounded"
-                    >
-                      <FiChevronLeft size={14} className="text-neutral-dark" />
-                    </button>
-                    <span className="text-sm font-semibold text-neutral-dark">
-                      {format(datePickerMonth, 'MMMM yyyy')}
-                    </span>
-                    <button
-                      onClick={() => setDatePickerMonth(addMonths(datePickerMonth, 1))}
-                      className="p-0.5 hover:bg-neutral-light rounded"
-                    >
-                      <FiChevronRight size={14} className="text-neutral-dark" />
-                    </button>
-                  </div>
-
-                  {/* Days of Week - Mon to Sun */}
-                  <div className="grid grid-cols-7 gap-0.5 mb-1.5">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                      <div key={day} className="text-center text-xs font-medium text-neutral-dark/70 py-0.5">
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-0.5">
-                    {(() => {
-                      const monthStart = startOfMonth(datePickerMonth)
-                      const monthEnd = endOfMonth(datePickerMonth)
-                      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
-                      const calendarEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6)
-                      const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
-
-                      return calendarDays.map((day) => {
-                        const isCurrentMonth = isSameMonth(day, datePickerMonth)
-                        const isCurrentDate = isToday(day)
-                        const isSelected = isSameDay(day, currentDate)
-                        const dayNumber = format(day, 'd')
-                        
-                        const hasEvents = scheduledItems.some(item => {
-                          if (!item.schedule?.day) return false
-                          const itemDate = new Date(item.schedule.day)
-                          return isSameDay(itemDate, day)
-                        })
-
-                        return (
-                          <button
-                            key={day.toString()}
-                            onClick={() => {
-                              setCurrentDate(day)
-                              setIsDatePickerOpen(false)
-                            }}
-                            className={`
-                              w-7 h-7 text-xs rounded-full flex items-center justify-center relative transition-colors font-medium
-                              ${!isCurrentMonth ? 'text-neutral-dark/30' : 'text-neutral-dark'}
-                              ${isSelected 
-                                ? 'bg-secondary text-white font-semibold' 
-                                : isCurrentDate 
-                                ? 'font-semibold text-white' 
-                                : hasEvents && !isSelected
-                                ? 'bg-amber-50 hover:bg-amber-100'
-                                : 'hover:bg-neutral-light'
-                              }
-                            `}
-                            style={isCurrentDate && !isSelected ? { backgroundColor: '#B084CC' } : undefined}
-                          >
-                            {dayNumber}
-                            {isSelected && (
-                              <div className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-0.5 h-0.5 bg-white rounded-full" />
-                            )}
-                          </button>
-                        )
-                      })
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Two Arrows Together - After Date */}
-            <div className="flex items-center gap-0">
-              <button
-                onClick={() => handleDateChange('prev')}
-                className="p-1 rounded transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <FiChevronLeft size={14} />
-              </button>
-              <button
-                onClick={() => handleDateChange('next')}
-                className="p-1 rounded transition-colors"
-                style={{ color: '#1F271B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <FiChevronRight size={14} />
-              </button>
-            </div>
-            {/* Today Button - After Arrows */}
-            <button
-              onClick={() => handleDateChange('today')}
-              className="px-2 py-1 text-sm font-medium rounded transition-colors"
-              style={{ color: '#1F271B' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-            >
-              Today
-            </button>
-          </div>
-
-          {/* Right Side - View Tabs */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* View Tabs */}
-            <div className="flex items-center border rounded overflow-hidden" style={{ borderColor: '#EAEBED' }}>
-            <button
-                onClick={() => setView('month')}
-                className={`px-2 py-1 text-sm font-medium transition-colors ${
-                  view === 'month' 
-                    ? 'text-white' 
-                    : 'hover:bg-opacity-50'
-                }`}
-                style={view === 'month' 
-                  ? { backgroundColor: '#2B50AA' }
-                  : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent' }
-                }
-                onMouseEnter={(e) => {
-                  if (view !== 'month') {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (view !== 'month') {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-              >
-                Month
-            </button>
-            <button
-              onClick={() => setView('week')}
-                className={`px-2 py-1 text-sm font-medium transition-colors border-l ${
-                  view === 'week' 
-                    ? 'text-white' 
-                    : 'hover:bg-opacity-50'
-              }`}
-              style={view === 'week' 
-                ? { backgroundColor: '#2B50AA', borderLeftColor: '#EAEBED' }
-                : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent', borderLeftColor: '#EAEBED' }
-              }
-              onMouseEnter={(e) => {
-                if (view !== 'week') {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (view !== 'week') {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }
-              }}
-            >
-              Week
-            </button>
-            <button
-                onClick={() => setView('day')}
-                className={`px-2 py-1 text-sm font-medium transition-colors border-l ${
-                  view === 'day' 
-                    ? 'text-white' 
-                    : 'hover:bg-opacity-50'
-                }`}
-                style={view === 'day' 
-                  ? { backgroundColor: '#2B50AA', borderLeftColor: '#EAEBED' }
-                  : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent', borderLeftColor: '#EAEBED' }
-                }
-                onMouseEnter={(e) => {
-                  if (view !== 'day') {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (view !== 'day') {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-              >
-                Day
-              </button>
-            </div>
-            {/* Unscheduled toggle button */}
-            <div className="relative flex items-center ml-1">
-              <button
-                ref={unscheduleButtonRef}
-                onClick={() => setShowUnscheduled(!showUnscheduled)}
-                className="px-2 py-1 rounded flex items-center justify-center flex-shrink-0 transition-colors text-sm"
-                style={{ backgroundColor: '#28AFB0', minHeight: '28px' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1E8A8B'
-                  setShowUnscheduledTooltip(true)
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#28AFB0'
-                  setShowUnscheduledTooltip(false)
-                }}
-                title="Unscheduled"
-              >
-                <span className="relative inline-flex items-center justify-center">
-                  <FiCalendar size={14} className="text-white" />
-                  <FiX size={8} className="text-white absolute -top-0.5 -right-0.5" strokeWidth={3} />
-                </span>
-              </button>
-              {showUnscheduledTooltip && unscheduleTooltipStyle && typeof document !== 'undefined' && createPortal(
-                <div
-                  className="fixed z-[200] px-2 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap shadow-md pointer-events-none"
-                  style={{
-                    backgroundColor: '#1F271B',
-                    left: unscheduleTooltipStyle.left,
-                    top: unscheduleTooltipStyle.top,
-                    transform: 'translate(-50%, 0)',
-                  }}
-                >
-                  Unscheduled
-                  {unscheduleTooltipStyle.above ? (
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px]"
-                      style={{ borderTopColor: '#1F271B' }}
-                    />
-                  ) : (
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px]"
-                      style={{ borderBottomColor: '#1F271B' }}
-                    />
-                  )}
-                </div>,
-                document.body
-              )}
-            </div>
-            {/* Mobile Unscheduled Toggle - text fallback */}
-            <button
-              onClick={() => setShowUnscheduled(!showUnscheduled)}
-              className="lg:hidden px-2 py-1 text-sm font-medium border rounded transition-colors"
-              style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-            >
-              Unscheduled
-            </button>
-          </div>
-        </div>
-
-        {/* Filters Row */}
-        <div className="flex items-center gap-1 mt-2">
-          {/* Type Filter Dropdown */}
-          <div ref={typeDropdownRef} className="relative flex items-center border rounded overflow-visible" style={{ borderColor: '#EAEBED' }}>
-                <span className="px-2 py-1 text-sm font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Type</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsTypeDropdownOpen(!isTypeDropdownOpen)
-                  }}
-                  className={`px-2 py-1 text-sm font-medium flex items-center gap-1 transition-colors ${
-                    selectedTypes.size === 2 
-                      ? 'bg-white border-l' 
-                      : 'hover:bg-opacity-50'
-                  }`}
-                  style={selectedTypes.size === 2 
-                    ? { color: '#1F271B', borderLeftColor: '#EAEBED', backgroundColor: 'white' }
-                    : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (selectedTypes.size !== 2) {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedTypes.size !== 2) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }
-                  }}
-                >
-                  {selectedTypes.size === 2 ? 'All' : `${selectedTypes.size} selected`}
-                  <FiChevronRight size={10} className={`transform transition-transform ${isTypeDropdownOpen ? 'rotate-90' : ''}`} />
-                </button>
-                {isTypeDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-xl z-[100] min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
-                    <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
-                      <input
-                        type="text"
-                        placeholder="Search types..."
-                        value={typeSearchTerm}
-                        onChange={(e) => setTypeSearchTerm(e.target.value)}
-                        className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
-                        style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                      <span className="text-sm font-medium" style={{ color: '#1F271B' }}>{selectedTypes.size} selected</span>
-                      <button
-                        onClick={() => selectedTypes.size === typeOptions.length ? clearTypeSelection() : setSelectedTypes(new Set(typeOptions.map(o => o.value)))}
-                        className="text-sm font-medium underline"
-                        style={{ color: '#28AFB0' }}
-                      >
-                        {selectedTypes.size === typeOptions.length ? 'Clear' : 'Select all'}
-                      </button>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto">
-                      {filteredTypeOptions.map((option) => {
-                        const isSelected = selectedTypes.has(option.value)
-                        return (
-                          <div
-                            key={option.value}
-                            onClick={() => toggleTypeSelection(option.value)}
-                            className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
-                            style={{ backgroundColor: 'transparent' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                          >
-                            <div className={`w-3.5 h-3.5 rounded-full flex-shrink-0 ${option.circleColor}`} />
-                            <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{option.label}</span>
-                            {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-          {/* Team Filter Dropdown */}
-          <div ref={teamDropdownRef} className="relative flex items-center border rounded overflow-visible" style={{ borderColor: '#EAEBED' }}>
-            <span className="px-2 py-1 text-sm font-medium bg-opacity-50" style={{ backgroundColor: '#F3F4F6', color: '#1F271B', opacity: 0.7 }}>Team</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsTeamDropdownOpen(!isTeamDropdownOpen)
-              }}
-              className={`px-2 py-1 text-sm font-medium flex items-center gap-1 transition-colors ${
-                selectedTeams.size === 0 || selectedTeams.size === teamOptions.length
-                  ? 'bg-white border-l'
-                  : 'hover:bg-opacity-50'
-              }`}
-              style={selectedTeams.size === 0 || selectedTeams.size === teamOptions.length
-                ? { color: '#1F271B', borderLeftColor: '#EAEBED', backgroundColor: 'white' }
-                : { color: '#1F271B', opacity: 0.7, backgroundColor: 'transparent' }
-              }
-              onMouseEnter={(e) => {
-                if (selectedTeams.size > 0 && selectedTeams.size !== teamOptions.length) {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selectedTeams.size > 0 && selectedTeams.size !== teamOptions.length) {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }
-              }}
-            >
-              {selectedTeams.size === 0 || selectedTeams.size === teamOptions.length ? 'All' : `${selectedTeams.size} selected`}
-              <FiChevronRight size={10} className={`transform transition-transform ${isTeamDropdownOpen ? 'rotate-90' : ''}`} />
-            </button>
-            {isTeamDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-xl z-[100] min-w-[180px]" style={{ borderColor: '#EAEBED' }}>
-                <div className="p-1.5 border-b" style={{ borderColor: '#EAEBED' }}>
-                  <input
-                    type="text"
-                    placeholder="Search team..."
-                    value={teamSearchTerm}
-                    onChange={(e) => setTeamSearchTerm(e.target.value)}
-                    className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1"
-                    style={{ borderColor: '#EAEBED', color: '#1F271B' }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-                <div className="px-2 py-1.5 border-b flex items-center justify-between" style={{ borderColor: '#EAEBED' }}>
-                  <span className="text-sm font-medium" style={{ color: '#1F271B' }}>{selectedTeams.size} selected</span>
-                  <button
-                    onClick={() => selectedTeams.size === teamOptions.length ? clearTeamSelection() : selectAllTeams()}
-                    className="text-sm font-medium underline"
-                    style={{ color: '#28AFB0' }}
-                  >
-                    {selectedTeams.size === teamOptions.length ? 'Clear' : 'Select all'}
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto">
-                  {filteredTeamOptions.map((option) => {
-                    const isSelected = selectedTeams.has(option.value)
-                    return (
-                      <div
-                        key={option.value}
-                        onClick={() => toggleTeamSelection(option.value)}
-                        className="px-2 py-1.5 cursor-pointer flex items-center gap-2 transition-colors"
-                        style={{ backgroundColor: 'transparent' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                      >
-                        <div className="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-[#2B50AA]" />
-                        <span className="text-sm font-medium flex-1 min-w-0" style={{ color: '#1F271B' }}>{option.label}</span>
-                        {isSelected && <FiCheck className="flex-shrink-0" size={16} style={{ color: '#28AFB0' }} strokeWidth={3} />}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
+      <CalendarControls
+        currentDate={currentDate}
+        setCurrentDate={setCurrentDate}
+        view={view}
+        setView={setView}
+        datePickerMonth={datePickerMonth}
+        setDatePickerMonth={setDatePickerMonth}
+        isDatePickerOpen={isDatePickerOpen}
+        setIsDatePickerOpen={setIsDatePickerOpen}
+        datePickerRef={datePickerRef}
+        handleDateChange={handleDateChange}
+        selectedTypes={selectedTypes}
+        typeOptions={typeOptions}
+        filteredTypeOptions={filteredTypeOptions}
+        typeSearchTerm={typeSearchTerm}
+        setTypeSearchTerm={setTypeSearchTerm}
+        isTypeDropdownOpen={isTypeDropdownOpen}
+        setIsTypeDropdownOpen={setIsTypeDropdownOpen}
+        typeDropdownRef={typeDropdownRef}
+        toggleTypeSelection={toggleTypeSelection}
+        clearTypeSelection={clearTypeSelection}
+        setSelectedTypes={setSelectedTypes}
+        selectedTeams={selectedTeams}
+        teamOptions={teamOptions}
+        filteredTeamOptions={filteredTeamOptions}
+        teamSearchTerm={teamSearchTerm}
+        setTeamSearchTerm={setTeamSearchTerm}
+        isTeamDropdownOpen={isTeamDropdownOpen}
+        setIsTeamDropdownOpen={setIsTeamDropdownOpen}
+        teamDropdownRef={teamDropdownRef}
+        toggleTeamSelection={toggleTeamSelection}
+        clearTeamSelection={clearTeamSelection}
+        selectAllTeams={selectAllTeams}
+        showUnscheduled={showUnscheduled}
+        setShowUnscheduled={setShowUnscheduled}
+        unscheduleButtonRef={unscheduleButtonRef}
+        showUnscheduledTooltip={showUnscheduledTooltip}
+        setShowUnscheduledTooltip={setShowUnscheduledTooltip}
+        unscheduleTooltipStyle={unscheduleTooltipStyle}
+        scheduledItems={scheduledItems}
+      />
       {/* Main Calendar Area */}
       <div className="flex-1 flex overflow-hidden relative w-full min-w-0">
         {/* Mobile Overlay */}
@@ -1811,52 +1193,30 @@ export default function ScheduleView() {
         </div>
 
         {/* Unscheduled Sidebar */}
-        {showUnscheduled && (
-          <div className={`${showUnscheduled ? 'flex' : 'hidden'} lg:flex w-64 max-w-[90vw] lg:max-w-none border-l border-neutral-light bg-white flex-col flex-shrink-0 fixed lg:relative right-0 top-0 bottom-0 z-30 lg:z-auto shadow-lg lg:shadow-none h-full`}>
-            <div className="p-4 border-b border-neutral-light flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-neutral-dark">Unscheduled</span>
-                <span className="text-sm text-neutral-dark/70">({unscheduledItems.length})</span>
-              </div>
-              <button onClick={() => setShowUnscheduled(false)} className="p-1 hover:bg-neutral-light rounded">
-                <FiX size={18} className="text-neutral-dark/70" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {unscheduledItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <div className="w-16 h-16 rounded-lg bg-neutral-light flex items-center justify-center mb-4">
-                    <FiCalendar className="text-neutral-dark/30" size={32} />
-                  </div>
-                  <p className="text-sm text-neutral-dark/70 mb-1">Drag items here to unschedule them</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {unscheduledItems.map((item) => (
-                    <div
-                      key={item.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/x-schedule-item', JSON.stringify({ id: item.id }))
-                        e.dataTransfer.effectAllowed = 'move'
-                        e.dataTransfer.setDragImage(e.currentTarget, 0, 0)
-                      }}
-                      className="p-3 bg-neutral-light rounded-lg border border-neutral-light cursor-grab active:cursor-grabbing hover:shadow-sm transition-shadow"
-                    >
-                      <p className="text-sm font-medium text-neutral-dark">{item.clientName}</p>
-                      <p className="text-xs text-neutral-dark/70 mt-1">{item.title}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <UnscheduledSidebar
+          showUnscheduled={showUnscheduled}
+          onClose={() => setShowUnscheduled(false)}
+          unscheduledItems={unscheduledItems}
+        />
       </div>
 
       </div>
     </div>
-    {eventDetailModal}
+    <EventDetailModal
+      selectedItem={selectedItem}
+      onClose={eventDetailOnClose}
+      updateWorkOrder={updateWorkOrder}
+      eventDetailAssignedList={eventDetailAssignedList}
+      isEventDetailAssignOpen={isEventDetailAssignOpen}
+      setIsEventDetailAssignOpen={setIsEventDetailAssignOpen}
+      eventDetailAssignSearchTerm={eventDetailAssignSearchTerm}
+      setEventDetailAssignSearchTerm={setEventDetailAssignSearchTerm}
+      eventDetailAssignToggle={eventDetailAssignToggle}
+      eventDetailAssignClear={eventDetailAssignClear}
+      eventDetailAssignSelectAll={eventDetailAssignSelectAll}
+      activeTeamMembers={activeTeamMembers}
+      filteredEventDetailTeam={filteredEventDetailTeam}
+    />
     </>
   )
 }

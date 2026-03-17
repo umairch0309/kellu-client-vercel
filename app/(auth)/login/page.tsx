@@ -30,6 +30,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -51,6 +52,11 @@ export default function LoginPage() {
     localStorage.setItem("isLoggedIn", "true");
     const role = data?.user?.role;
     router.push(role === "SUPER_ADMIN" ? "/admin" : "/");
+  };
+
+  const fillCredentials = (email: string, password: string) => {
+    setValue("email", email, { shouldValidate: false });
+    setValue("password", password, { shouldValidate: false });
   };
 
   return (
@@ -174,6 +180,68 @@ export default function LoginPage() {
               {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
+        </div>
+
+        {/* Test Credentials Box */}
+        <div
+          className="mt-4 rounded-lg p-4 border"
+          style={{ backgroundColor: "#F9FAFB", borderColor: "#EAEBED" }}
+        >
+          <p
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "#1F271B", opacity: 0.5 }}
+          >
+            Test credentials
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Admin */}
+            <button
+              type="button"
+              onClick={() => fillCredentials("test@admin.com", "12345678")}
+              className="text-left p-3 rounded-lg border transition-colors hover:border-[#28AFB0] hover:bg-white group"
+              style={{ borderColor: "#EAEBED", backgroundColor: "white" }}
+            >
+              <p
+                className="text-xs font-semibold mb-1.5"
+                style={{ color: "#28AFB0" }}
+              >
+                Admin login
+              </p>
+              <p className="text-xs" style={{ color: "#1F271B", opacity: 0.7 }}>
+                test@admin.com
+              </p>
+              <p className="text-xs" style={{ color: "#1F271B", opacity: 0.7 }}>
+                12345678
+              </p>
+            </button>
+
+            {/* Business */}
+            <button
+              type="button"
+              onClick={() => fillCredentials("test@business.com", "12345678")}
+              className="text-left p-3 rounded-lg border transition-colors hover:border-[#28AFB0] hover:bg-white group"
+              style={{ borderColor: "#EAEBED", backgroundColor: "white" }}
+            >
+              <p
+                className="text-xs font-semibold mb-1.5"
+                style={{ color: "#28AFB0" }}
+              >
+                Business login
+              </p>
+              <p className="text-xs" style={{ color: "#1F271B", opacity: 0.7 }}>
+                test@business.com
+              </p>
+              <p className="text-xs" style={{ color: "#1F271B", opacity: 0.7 }}>
+                12345678
+              </p>
+            </button>
+          </div>
+          <p
+            className="text-xs mt-2.5 text-center"
+            style={{ color: "#1F271B", opacity: 0.4 }}
+          >
+            Click a card to auto-fill the form
+          </p>
         </div>
       </div>
     </div>
