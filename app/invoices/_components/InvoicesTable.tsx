@@ -2,12 +2,18 @@
 
 import { format } from 'date-fns'
 import { FiSend, FiFileText } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { InvoiceRow } from './invoicesListTypes'
 
 export interface InvoicesTableProps {
   invoices: InvoiceRow[]
-  onRowClick: (workorderId: number) => void
-  onSendInvoice: (workorderId: number) => void
+  onRowClick: (workorderId: string | number) => void
+  /** POST /api/invoices/{invoiceId}/send — use invoice id, not work order id */
+  onSendInvoice: (invoiceId: string | number) => void
+  /** Opens print/PDF preview via usePDFDownload with invoice row data */
+  onReviewInvoice: (inv: InvoiceRow) => void
+  /** When set, send button shows busy state for that invoice id */
+  sendingInvoiceId?: string | number | null
 }
 
 function getStatusColor(status: string) {
@@ -28,11 +34,18 @@ function getStatusLabel(status: string) {
     'waiting for payment': 'Waiting Payment',
     'paid': 'Paid',
     'bad debt': 'Bad Debt',
+    cancelled: 'Cancelled',
   }
   return labels[status] ?? status
 }
 
-export default function InvoicesTable({ invoices, onRowClick, onSendInvoice }: InvoicesTableProps) {
+export default function InvoicesTable({
+  invoices,
+  onRowClick,
+  onSendInvoice,
+  onReviewInvoice,
+  sendingInvoiceId = null,
+}: InvoicesTableProps) {
   if (invoices.length === 0) {
     return (
       <div className="p-8 text-center">
@@ -81,23 +94,28 @@ export default function InvoicesTable({ invoices, onRowClick, onSendInvoice }: I
                   </span>
                 </td>
                 <td className="py-2 px-2 text-right">
-                  <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>${inv.total.toLocaleString()}</span>
+                  <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>{formatUsd(inv.total)}</span>
                 </td>
                 <td className="py-2 px-2 text-right">
                   <span className={`text-xs font-semibold ${inv.balance === 0 ? 'text-secondary' : 'text-tertiary'}`}>
-                    ${inv.balance.toLocaleString()}
+                    {formatUsd(inv.balance)}
                   </span>
                 </td>
                 <td className="py-2 px-2 text-right">
                   <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                    {(inv.status === 'invoice pending to send' || inv.dateSent) && (
+                    {(inv.status === 'invoice pending to send' || (inv.dateSent && inv.status !== 'cancelled')) && (
                       <button
                         type="button"
-                        onClick={() => onSendInvoice(inv.workorderId)}
-                        className="p-1.5 rounded transition-all"
+                        disabled={sendingInvoiceId != null && String(sendingInvoiceId) === String(inv.id)}
+                        onClick={() => onSendInvoice(inv.id)}
+                        className="p-1.5 rounded transition-all disabled:opacity-40 disabled:pointer-events-none"
                         style={{ color: '#28AFB0', backgroundColor: 'transparent' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F0FDFA' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                        onMouseEnter={(e) => {
+                          if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#F0FDFA'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
                         title={inv.dateSent ? 'Resend Invoice' : 'Send Invoice'}
                       >
                         <FiSend size={14} />
@@ -105,12 +123,16 @@ export default function InvoicesTable({ invoices, onRowClick, onSendInvoice }: I
                     )}
                     <button
                       type="button"
-                      onClick={() => alert('Review generated documents / PDF would open here')}
+                      onClick={() => onReviewInvoice(inv)}
                       className="p-1.5 rounded transition-all"
                       style={{ color: '#1F271B', backgroundColor: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                      title="Review generated documents"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                      title="Review generated document"
                     >
                       <FiFileText size={14} />
                     </button>

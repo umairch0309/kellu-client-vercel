@@ -8,7 +8,7 @@ export interface NewWorkorderNotesSectionProps {
 export default function NewWorkorderNotesSection({ notes, onFieldChange }: NewWorkorderNotesSectionProps) {
   return (
     <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Notes</h2>
+      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Notes <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional)</span></h2>
       <textarea
         name="notes"
         value={notes}

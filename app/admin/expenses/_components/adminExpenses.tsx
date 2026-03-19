@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { FiSearch, FiChevronDown, FiChevronRight } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 
 export function AdminExpenses() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -96,7 +97,7 @@ export function AdminExpenses() {
               <FiChevronRight size={12} style={{ color: '#1F271B', opacity: 0.5 }} />
             </div>
             <p className="text-[10px] mb-1.5" style={{ color: '#1F271B', opacity: 0.6 }}>All expenses</p>
-            <span className="text-2xl font-bold" style={{ color: '#1F271B' }}>$0</span>
+            <span className="text-2xl font-bold" style={{ color: '#1F271B' }}>{formatUsd(0)}</span>
             <p className="text-[10px] mt-1" style={{ color: '#1F271B', opacity: 0.6 }}>No expenses recorded</p>
           </div>
         </div>

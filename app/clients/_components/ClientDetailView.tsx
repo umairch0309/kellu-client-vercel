@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { FiEdit, FiMoreVertical, FiPlus, FiChevronLeft, FiMail, FiUser, FiFileText, FiUpload, FiTrash2 } from 'react-icons/fi'
 import { mockClients, mockWorkorders } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 import { useClientReminders } from '@/context/ClientRemindersContext'
 import AddWorkorderModal from './AddWorkorderModal'
 import SendMessageModal from './SendMessageModal'
@@ -259,7 +260,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                         </div>
                         <p className="text-[10px] mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>SCHEDULED FOR {wo.schedule.day}</p>
                         <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.8 }}>{wo.address}</p>
-                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${wo.total}</p>
+                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>{formatUsd(Number(wo.total) || 0)}</p>
                       </div>
                     ))}
                   </div>
@@ -283,7 +284,7 @@ export default function ClientDetailView({ clientId }: ClientDetailViewProps) {
                         </div>
                         <p className="text-[10px] mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>SCHEDULED FOR {wo.schedule.day}</p>
                         <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.8 }}>{wo.address}</p>
-                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${wo.total}</p>
+                        <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>{formatUsd(Number(wo.total) || 0)}</p>
                       </div>
                     ))}
                   </div>

@@ -13,7 +13,7 @@ export interface ExpenseForm {
   itemName: string
   details: string
   total: number
-  linkedWorkorder: number | null
+  linkedWorkorder: number | string | null
   invoiceNumber: string
   attachment: File | null
 }

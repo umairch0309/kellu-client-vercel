@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { FiX } from 'react-icons/fi'
 
 export interface BookingConfirmationModalProps {
@@ -17,7 +18,7 @@ export interface BookingConfirmationModalProps {
   setBookingSendWhatsApp: (v: boolean) => void
   bookingIncludeTeamPictures: boolean
   setBookingIncludeTeamPictures: (v: boolean) => void
-  onSend: () => void
+  onSend: () => void | Promise<void>
   isResend: boolean
 }
 
@@ -39,7 +40,23 @@ export default function BookingConfirmationModal({
   onSend,
   isResend,
 }: BookingConfirmationModalProps) {
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+
   if (!isOpen || !workorder || !client) return null
+
+  const handleSend = async () => {
+    setSendError(null)
+    setSending(true)
+    try {
+      await onSend()
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to send')
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" style={{ borderColor: '#EAEBED' }}>
@@ -75,9 +92,14 @@ export default function BookingConfirmationModal({
             </label>
           </div>
         </div>
+        {sendError && (
+          <div className="px-3 pb-2">
+            <p className="text-sm" style={{ color: '#B91C1C' }}>{sendError}</p>
+          </div>
+        )}
         <div className="flex items-center justify-end gap-2 p-3 border-t" style={{ borderColor: '#EAEBED' }}>
-          <button onClick={onClose} className="px-3 py-1.5 rounded text-sm font-medium border" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>Cancel</button>
-          <button onClick={onSend} className="px-3 py-1.5 rounded text-sm font-medium text-white" style={{ backgroundColor: '#28AFB0' }}>Send</button>
+          <button type="button" onClick={onClose} disabled={sending} className="px-3 py-1.5 rounded text-sm font-medium border disabled:opacity-50" style={{ borderColor: '#EAEBED', color: '#1F271B' }}>Cancel</button>
+          <button type="button" onClick={handleSend} disabled={sending} className="px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#28AFB0' }}>{sending ? 'Sending…' : 'Send'}</button>
         </div>
       </div>
     </div>

@@ -9,9 +9,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 const USER = { name: 'Test User', email: 'matcareapp@gmail.com' }
 
 const MOCK_ACTIVITIES = [
-  { id: 1, type: 'invoice', text: 'test u created an invoice - Rs889.00', detail: 'Invoice #1 - Testing', client: 'client test', ago: '19 hours ago', icon: FiDollarSign, iconBg: '#2B50AA' },
+  { id: 1, type: 'invoice', text: 'test u created an invoice - $889.00', detail: 'Invoice #1 - Testing', client: 'client test', ago: '19 hours ago', icon: FiDollarSign, iconBg: '#2B50AA' },
   { id: 2, type: 'job', text: 'test u created a job', detail: 'Job #2 - Testing', client: 'client test', ago: '5 days ago', icon: FiPackage, iconBg: '#28AFB0' },
-  { id: 3, type: 'quote', text: 'test u created a quote - Rs195.00', detail: 'Quote #1 - Exterior Window Cleaning', client: 'client test', ago: '7 days ago', icon: FiFileText, iconBg: '#DC2626' },
+  { id: 3, type: 'quote', text: 'test u created a quote - $195.00', detail: 'Quote #1 - Exterior Window Cleaning', client: 'client test', ago: '7 days ago', icon: FiFileText, iconBg: '#DC2626' },
   { id: 4, type: 'job', text: 'test u created a job', detail: 'Job #1 - Testing', client: 'client test', ago: '7 days ago', icon: FiPackage, iconBg: '#28AFB0' },
   { id: 5, type: 'lead', text: 'test u created a lead', detail: '', client: 'client test', ago: '8 days ago', icon: FiUser, iconBg: '#6B7280' },
 ]

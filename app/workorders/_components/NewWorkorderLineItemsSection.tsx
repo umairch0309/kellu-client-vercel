@@ -1,10 +1,11 @@
 'use client'
 
 import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { LineItem } from './newWorkorderFormTypes'
 
 export interface MaterialOption {
-  id: number
+  id: number | string
   name: string
   description?: string
   unitPrice: number
@@ -63,7 +64,7 @@ export default function NewWorkorderLineItemsSection({
 
   return (
     <div ref={lineItemsSectionRef} className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Product / Service</h2>
+      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Product / Service <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional)</span></h2>
       {lineItems.length === 0 ? (
         <div className="p-4 rounded text-center border mb-3" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6' }}>
           <p className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>No line items added</p>
@@ -109,7 +110,7 @@ export default function NewWorkorderLineItemsSection({
                             >
                               <div className="flex justify-between items-start gap-2">
                                 <span className="font-medium">{m.name}</span>
-                                <span className="text-xs font-medium flex-shrink-0" style={{ opacity: 0.9 }}>Rs{(m.unitPrice ?? 0).toFixed(2)}</span>
+                                <span className="text-xs font-medium flex-shrink-0" style={{ opacity: 0.9 }}>{formatUsd(m.unitPrice ?? 0)}</span>
                               </div>
                               {m.description && (
                                 <div className="text-xs mt-0.5 truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{m.description}</div>
@@ -185,7 +186,7 @@ export default function NewWorkorderLineItemsSection({
                     <div className="w-24 flex flex-col justify-end pb-0.5">
                       <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.8 }}>Total</label>
                       <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-                        Rs{calculateLineItemTotal(item).toFixed(2)}
+                        {formatUsd(calculateLineItemTotal(item))}
                       </div>
                     </div>
                     <button
@@ -221,7 +222,7 @@ export default function NewWorkorderLineItemsSection({
         <div className="space-y-1">
           <div className="flex justify-between text-sm" style={{ color: '#1F271B' }}>
             <span>Subtotal</span>
-            <span>Rs {subtotal.toFixed(2)}</span>
+            <span>{formatUsd(subtotal)}</span>
           </div>
           <div className="flex justify-between items-center text-sm gap-2">
             <span style={{ color: '#1F271B' }}>Discount (%)</span>
@@ -236,23 +237,23 @@ export default function NewWorkorderLineItemsSection({
               className="w-20 px-2 py-1 border rounded text-right text-sm"
               style={{ borderColor: '#EAEBED', color: '#1F271B' }}
             />
-            <span className="w-20 text-right">Rs {discountAmount.toFixed(2)}</span>
+            <span className="w-20 text-right">{formatUsd(discountAmount)}</span>
           </div>
           <div className="flex justify-between text-sm" style={{ color: '#1F271B' }}>
             <span>Tax ({taxRatePercent}%)</span>
-            <span>Rs {taxAmount.toFixed(2)}</span>
+            <span>{formatUsd(taxAmount)}</span>
           </div>
           <div className="flex justify-between text-sm font-bold pt-1" style={{ color: '#1F271B' }}>
             <span>Total</span>
-            <span>Rs {grandTotal.toFixed(2)}</span>
+            <span>{formatUsd(grandTotal)}</span>
           </div>
           <div className="flex justify-between text-sm pt-1" style={{ color: '#1F271B' }}>
             <span>Costs</span>
-            <span>Rs {totalCost.toFixed(2)}</span>
+            <span>{formatUsd(totalCost)}</span>
           </div>
           <div className="flex justify-between text-sm font-medium pt-1" style={{ color: '#1F271B' }}>
             <span>Estimated margin</span>
-            <span>Rs {estimatedMargin.toFixed(2)} ({estimatedMarginPercent.toFixed(0)}%)</span>
+            <span>{formatUsd(estimatedMargin)} ({estimatedMarginPercent.toFixed(0)}%)</span>
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ const TALLY_WORK_REPORT_BASE_URL = typeof process !== 'undefined' && process.env
   : 'https://tally.so'
 
 export interface WorkorderDetailHeaderProps {
-  workorderId: number
+  workorderId: number | string
   workorder: any
   onBookingConfirmation: () => void
   onEdit: () => void

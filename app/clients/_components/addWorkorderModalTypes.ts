@@ -7,6 +7,8 @@ export interface LineItemForm {
 
 export interface AddWorkorderFormData {
   client: string
+  /** Set when user picks a client from API (invoice / real client list) */
+  clientId: string | number | null
   address: string
   title: string
   instructions: string
@@ -35,7 +37,7 @@ export interface AddWorkorderModalProps {
   initialDate?: Date
   initialTime?: string
   position?: { x: number; y: number }
-  initialClientId?: number
+  initialClientId?: number | string
   mode?: AddWorkorderModalMode
   onTaskCreated?: (task: {
     title: string
@@ -82,8 +84,9 @@ export interface AssignOption {
 }
 
 export interface ClientOption {
-  id: number
+  id: number | string
   name: string
   address?: string
   phone?: string
+  email?: string
 }

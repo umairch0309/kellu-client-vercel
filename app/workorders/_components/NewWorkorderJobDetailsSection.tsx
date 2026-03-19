@@ -3,15 +3,15 @@
 import { FiPlus } from 'react-icons/fi'
 
 export interface ClientOption {
-  id: number
+  id: number | string
   name: string
-  phone: string
+  phone?: string
   email?: string
 }
 
 export interface NewWorkorderJobDetailsSectionProps {
   title: string
-  clientId: number | null
+  clientId: number | string | null
   clientName: string
   address: string
   onFieldChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void
@@ -21,8 +21,9 @@ export interface NewWorkorderJobDetailsSectionProps {
   setIsClientDropdownOpen: (v: boolean) => void
   clientDropdownRef: React.RefObject<HTMLDivElement>
   filteredClients: ClientOption[]
-  onClientSelect: (clientId: number, clientName: string) => void
+  onClientSelect: (clientId: number | string, clientName: string) => void
   onOpenAddClient: () => void
+  clientsLoading?: boolean
 }
 
 const inputFocusStyles = {
@@ -50,6 +51,7 @@ export default function NewWorkorderJobDetailsSection({
   filteredClients,
   onClientSelect,
   onOpenAddClient,
+  clientsLoading = false,
 }: NewWorkorderJobDetailsSectionProps) {
   return (
     <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
@@ -57,7 +59,7 @@ export default function NewWorkorderJobDetailsSection({
       <div className="grid grid-cols-1 gap-4">
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Title</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Title <span style={{ color: '#B91C1C' }}>*</span></label>
             <input
               type="text"
               name="title"
@@ -72,7 +74,7 @@ export default function NewWorkorderJobDetailsSection({
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Select a client</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Select a client <span style={{ color: '#B91C1C' }}>*</span></label>
             <div className="relative" ref={clientDropdownRef}>
               <input
                 type="text"
@@ -94,28 +96,36 @@ export default function NewWorkorderJobDetailsSection({
               {isClientDropdownOpen && (
                 <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg flex flex-col" style={{ borderColor: '#EAEBED', maxHeight: '12rem' }}>
                   <div className="overflow-y-auto flex-1 min-h-0">
-                    {filteredClients.map((client) => (
-                      <button
-                        key={client.id}
-                        type="button"
-                        onClick={() => onClientSelect(client.id, client.name)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-opacity-50 transition-colors border-b"
-                        style={{
-                          color: '#1F271B',
-                          backgroundColor: clientId === client.id ? '#F3F4F6' : 'white',
-                          borderBottomColor: '#EAEBED',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (clientId !== client.id) e.currentTarget.style.backgroundColor = '#F9FAFB'
-                        }}
-                        onMouseLeave={(e) => {
-                          if (clientId !== client.id) e.currentTarget.style.backgroundColor = 'white'
-                        }}
-                      >
-                        <div className="font-medium">{client.name}</div>
-                        <div className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>{client.phone}</div>
-                      </button>
-                    ))}
+                    {clientsLoading ? (
+                      <div className="px-3 py-4 text-center text-xs" style={{ color: '#6B7280' }}>Loading clients…</div>
+                    ) : filteredClients.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-xs" style={{ color: '#6B7280' }}>No clients found</div>
+                    ) : (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => onClientSelect(client.id, client.name)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-opacity-50 transition-colors border-b"
+                          style={{
+                            color: '#1F271B',
+                            backgroundColor: String(clientId) === String(client.id) ? '#F3F4F6' : 'white',
+                            borderBottomColor: '#EAEBED',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (String(clientId) !== String(client.id)) e.currentTarget.style.backgroundColor = '#F9FAFB'
+                          }}
+                          onMouseLeave={(e) => {
+                            if (String(clientId) !== String(client.id)) e.currentTarget.style.backgroundColor = 'white'
+                          }}
+                        >
+                          <div className="font-medium">{client.name}</div>
+                          {client.phone != null && client.phone !== '' && (
+                            <div className="text-xs" style={{ color: '#1F271B', opacity: 0.6 }}>{client.phone}</div>
+                          )}
+                        </button>
+                      ))
+                    )}
                   </div>
                   <button
                     type="button"
@@ -138,7 +148,7 @@ export default function NewWorkorderJobDetailsSection({
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Address</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Address <span style={{ color: '#B91C1C' }}>*</span></label>
             <p className="text-[10px] mb-1" style={{ color: '#1F271B', opacity: 0.6 }}>Fetched from last registered workorder or task of selected client</p>
             <input
               type="text"

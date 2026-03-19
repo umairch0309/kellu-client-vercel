@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns'
 import { FiSend, FiFileText } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { QuoteRow } from './quotesListTypes'
 
 export interface QuotesTableProps {
@@ -117,7 +118,7 @@ export default function QuotesTable({
                 </td>
                 <td className="py-2 px-2 text-right">
                   <span className="text-xs font-semibold" style={{ color: '#1F271B' }}>
-                    Rs{quote.total.toFixed(2)}
+                    {formatUsd(quote.total)}
                   </span>
                 </td>
                 <td className="py-2 px-2 text-right">

@@ -5,7 +5,7 @@ import { FiSave, FiUser, FiPhone, FiMail, FiFileText, FiMessageSquare } from 're
 import Modal from './Modal'
 
 interface Client {
-  id: number
+  id: number | string
   uniqueIdentifier?: string
   name: string
   phone: string
@@ -36,9 +36,13 @@ interface AddClientModalProps {
   mode?: 'new' | 'update'
   /** When provided, called with the new client data on save (e.g. to fill a parent form like workorder) */
   onSuccess?: (data: NewClientData) => void
+  /** When provided, called after a new client is created (e.g. to refetch the clients list) */
+  onCreated?: () => void
+  /** When provided, called after a client is updated (e.g. to refetch the clients list) */
+  onUpdated?: () => void
 }
 
-export default function AddClientModal({ isOpen, onClose, client, mode = 'new', onSuccess }: AddClientModalProps) {
+export default function AddClientModal({ isOpen, onClose, client, mode = 'new', onSuccess, onCreated, onUpdated }: AddClientModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -47,6 +51,8 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
     leadSource: '',
     notes: '',
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isOpen && client && mode === 'update') {
@@ -58,6 +64,7 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         leadSource: client.leadSource || '',
         notes: client.notes || '',
       })
+      setSubmitError(null)
     } else if (isOpen && mode === 'new') {
       setFormData({
         name: '',
@@ -67,32 +74,89 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
         leadSource: '',
         notes: '',
       })
+      setSubmitError(null)
     }
   }, [isOpen, client, mode])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
+
     if (mode === 'new') {
-      onSuccess?.({
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email || undefined,
-        documentNumber: formData.documentNumber || undefined,
-        leadSource: formData.leadSource || undefined,
-        notes: formData.notes || undefined,
-      })
+      setIsSubmitting(true)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const body: Record<string, string> = {
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+      }
+      if (formData.email.trim()) body.email = formData.email.trim()
+      if (formData.documentNumber.trim()) body.documentNumber = formData.documentNumber.trim()
+      if (formData.leadSource.trim()) body.leadSource = formData.leadSource.trim()
+      if (formData.notes.trim()) body.notes = formData.notes.trim()
+      try {
+        const res = await fetch(`${baseUrl}/api/clients`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const message = (data as { message?: string }).message ?? `Request failed (${res.status})`
+          setSubmitError(message)
+          return
+        }
+        onSuccess?.({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim() || undefined,
+          documentNumber: formData.documentNumber.trim() || undefined,
+          leadSource: formData.leadSource.trim() || undefined,
+          notes: formData.notes.trim() || undefined,
+        })
+        onCreated?.()
+        setFormData({ name: '', phone: '', email: '', documentNumber: '', leadSource: '', notes: '' })
+        onClose()
+      } catch (err) {
+        setSubmitError(err instanceof Error ? err.message : 'Failed to create client')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
     }
-    alert(mode === 'update' ? 'Client updated successfully! (Static UI)' : 'Client created successfully! (Static UI)')
-    onClose()
-    if (mode === 'new') {
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        documentNumber: '',
-        leadSource: '',
-        notes: '',
+
+    // Update mode: PATCH /api/clients/{clientId}
+    if (!client?.id) return
+    setIsSubmitting(true)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    const body: Record<string, string> = {
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+    }
+    if (formData.email.trim()) body.email = formData.email.trim()
+    if (formData.documentNumber.trim()) body.documentNumber = formData.documentNumber.trim()
+    if (formData.leadSource.trim()) body.leadSource = formData.leadSource.trim()
+    if (formData.notes.trim()) body.notes = formData.notes.trim()
+    try {
+      const res = await fetch(`${baseUrl}/api/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message = (data as { message?: string }).message ?? `Request failed (${res.status})`
+        setSubmitError(message)
+        return
+      }
+      onUpdated?.()
+      setFormData({ name: '', phone: '', email: '', documentNumber: '', leadSource: '', notes: '' })
+      onClose()
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to update client')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -110,6 +174,11 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={mode === 'update' ? 'Update Client' : 'Add Client'} size="md" maxHeight="80vh">
       <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+        {submitError && (
+          <div className="mb-4 px-3 py-2 rounded-lg text-sm bg-red-50 border border-red-200" style={{ color: '#B91C1C' }}>
+            {submitError}
+          </div>
+        )}
         <div className="space-y-6 pb-1">
           {/* Contact details */}
           <section className="space-y-4">
@@ -263,11 +332,14 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
           </button>
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 text-white order-1 sm:order-2"
+            disabled={mode === 'new' ? isSubmitting : false}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 text-white order-1 sm:order-2 disabled:opacity-70 disabled:pointer-events-none"
             style={{ backgroundColor: '#28AFB0' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#1E8A8B'
-              e.currentTarget.style.transform = 'translateY(-1px)'
+              if (!(mode === 'new' && isSubmitting)) {
+                e.currentTarget.style.backgroundColor = '#1E8A8B'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#28AFB0'
@@ -275,7 +347,7 @@ export default function AddClientModal({ isOpen, onClose, client, mode = 'new', 
             }}
           >
             <FiSave size={16} />
-            {mode === 'update' ? 'Update Client' : 'Save Client'}
+            {mode === 'update' ? 'Update Client' : isSubmitting ? 'Saving…' : 'Save Client'}
           </button>
         </div>
       </form>

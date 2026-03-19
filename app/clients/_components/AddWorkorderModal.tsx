@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { format, parse } from 'date-fns'
 import { mockClients, mockTeamMembers, mockMasterPriceList, mockWorkorders } from '@/data/mockData'
+import { extractClientsList, normalizeApiClientOption, type ApiClientOption } from '@/lib/clientsListApi'
+import { extractPriceList, normalizePriceListSelectItem, type PriceListSelectItem } from '@/lib/priceListApi'
 import AddClientModal from './AddClientModal'
 import type { AddWorkorderFormData } from './addWorkorderModalTypes'
 import AddWorkorderModalHeader from './AddWorkorderModalHeader'
@@ -38,6 +41,7 @@ function formatTime(hour: number, minute: number, period: 'AM' | 'PM'): string {
 
 const defaultFormState = (): AddWorkorderFormData => ({
   client: '',
+  clientId: null,
   address: '',
   title: '',
   instructions: '',
@@ -61,10 +65,17 @@ export default function AddWorkorderModal({
   onTaskUpdated,
   onConvertToWorkorder,
 }: AddWorkorderModalProps) {
+  const router = useRouter()
   const quoteOnly = mode === 'quote-only'
   const invoiceOnly = mode === 'invoice-only'
   const taskOnly = mode === 'task'
   const documentOnly = quoteOnly || invoiceOnly
+
+  const [apiClients, setApiClients] = useState<ApiClientOption[]>([])
+  const [clientsLoading, setClientsLoading] = useState(false)
+  const [priceListItems, setPriceListItems] = useState<PriceListSelectItem[]>([])
+  const [priceListLoading, setPriceListLoading] = useState(false)
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
 
   const [taskType, setTaskType] = useState<'workorder' | 'task'>(taskOnly ? 'task' : 'workorder')
   const effectiveTaskType = taskOnly ? 'task' : taskType
@@ -105,6 +116,7 @@ export default function AddWorkorderModal({
       }
       return {
         client: editingTask.clientName,
+        clientId: null,
         address: editingTask.address ?? '',
         title: editingTask.title,
         instructions: editingTask.instructions ?? '',
@@ -137,7 +149,20 @@ export default function AddWorkorderModal({
   const clearAssignSelection = () => setFormData(prev => ({ ...prev, assignedTeamMembers: [] }))
   const selectAllAssign = () => setFormData(prev => ({ ...prev, assignedTeamMembers: assignOptions.map(o => o.value) }))
 
-  const addLineItemFiltered = mockMasterPriceList.filter(
+  const masterPriceSource = useMemo(() => {
+    if (invoiceOnly) {
+      return priceListItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        type: item.type,
+      }))
+    }
+    return mockMasterPriceList
+  }, [invoiceOnly, priceListItems])
+
+  const addLineItemFiltered = masterPriceSource.filter(
     item => item.name.toLowerCase().includes(addLineItemSearchTerm.toLowerCase()) ||
       (item.description || '').toLowerCase().includes(addLineItemSearchTerm.toLowerCase())
   )
@@ -177,12 +202,102 @@ export default function AddWorkorderModal({
     setIsEndTimeDropdownOpen(false)
   }
 
-  const filteredClientsForModal = mockClients.filter(
-    c =>
-      c.name.toLowerCase().includes((formData.client || '').toLowerCase()) ||
-      (c.address || '').toLowerCase().includes((formData.client || '').toLowerCase()) ||
+  const filteredClientsForModal = useMemo(() => {
+    const term = (formData.client || '').toLowerCase()
+    if (invoiceOnly) {
+      return apiClients
+        .filter(
+          (c) =>
+            c.name.toLowerCase().includes(term) ||
+            (c.phone || '').toLowerCase().includes(term) ||
+            (c.email || '').toLowerCase().includes(term)
+        )
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          address: c.address,
+          phone: c.phone,
+          email: c.email,
+        }))
+    }
+    return mockClients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        (c.address || '').toLowerCase().includes(term) ||
       (c.phone || '').includes(formData.client || '')
   )
+  }, [invoiceOnly, apiClients, formData.client])
+
+  useEffect(() => {
+    if (!isOpen || !invoiceOnly) return
+    let cancelled = false
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    setClientsLoading(true)
+    fetch(`${baseUrl}/api/clients`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return
+        const rows = extractClientsList(json)
+          .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
+          .map((raw) => normalizeApiClientOption(raw))
+        setApiClients(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setApiClients([])
+      })
+      .finally(() => {
+        if (!cancelled) setClientsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, invoiceOnly])
+
+  useEffect(() => {
+    if (!isOpen || !invoiceOnly) return
+    let cancelled = false
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    setPriceListLoading(true)
+    fetch(`${baseUrl}/api/price-list`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return
+        const rows = extractPriceList(json)
+          .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
+          .map((raw) => normalizePriceListSelectItem(raw as Record<string, unknown>))
+        setPriceListItems(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setPriceListItems([])
+      })
+      .finally(() => {
+        if (!cancelled) setPriceListLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, invoiceOnly])
+
+  useEffect(() => {
+    if (!isOpen || !invoiceOnly || initialClientId == null || initialClientId === '') return
+    const c = apiClients.find((x) => String(x.id) === String(initialClientId))
+    if (c) {
+      setFormData((prev) => ({
+        ...prev,
+        client: c.name,
+        clientId: c.id,
+        address: c.address || prev.address,
+      }))
+    }
+  }, [isOpen, invoiceOnly, initialClientId, apiClients])
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return
@@ -230,27 +345,52 @@ export default function AddWorkorderModal({
 
   useEffect(() => {
     if (!isOpen) return
-    const client = initialClientId ? mockClients.find(c => c.id === initialClientId) : null
-    setFormData(prev => ({
-      ...prev,
-      client: client ? client.name : '',
-      address: client ? (client.address || '') : '',
-      startDate: initialDate ? format(initialDate, 'MMM d, yyyy') : format(new Date(), 'MMM d, yyyy'),
-      startTime: initialTime || '03:15 AM',
-      endTime: initialTime ? (() => {
-        const [time, period] = initialTime.split(' ')
-        const [hours, minutes] = time.split(':')
-        let hour = parseInt(hours)
-        if (period === 'PM' && hour !== 12) hour += 12
-        if (period === 'AM' && hour === 12) hour = 0
-        const endHour = (hour + 1) % 24
-        const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
-        const endAmpm = endHour >= 12 ? 'PM' : 'AM'
-        return `${endHour12}:${minutes} ${endAmpm}`
-      })() : '04:15 AM',
-    }))
-    setAnytime(!initialTime)
-  }, [isOpen, initialDate, initialTime, initialClientId])
+    if (invoiceOnly) {
+      setFormData({
+        ...defaultFormState(),
+        startDate: initialDate ? format(initialDate, 'MMM d, yyyy') : format(new Date(), 'MMM d, yyyy'),
+        startTime: initialTime || '03:15 AM',
+        endTime: initialTime
+          ? (() => {
+              const [time, period] = initialTime.split(' ')
+              const [hours, minutes] = time.split(':')
+              let hour = parseInt(hours, 10)
+              if (period === 'PM' && hour !== 12) hour += 12
+              if (period === 'AM' && hour === 12) hour = 0
+              const endHour = (hour + 1) % 24
+              const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
+              const endAmpm = endHour >= 12 ? 'PM' : 'AM'
+              return `${endHour12}:${minutes} ${endAmpm}`
+            })()
+          : '04:15 AM',
+      })
+      setAnytime(!initialTime)
+      return
+    }
+    const client = initialClientId ? mockClients.find((c) => String(c.id) === String(initialClientId)) : null
+    setFormData((prev) => ({
+        ...prev,
+        client: client ? client.name : '',
+      clientId: null,
+      address: client ? client.address || '' : '',
+        startDate: initialDate ? format(initialDate, 'MMM d, yyyy') : format(new Date(), 'MMM d, yyyy'),
+        startTime: initialTime || '03:15 AM',
+      endTime: initialTime
+        ? (() => {
+          const [time, period] = initialTime.split(' ')
+          const [hours, minutes] = time.split(':')
+            let hour = parseInt(hours, 10)
+          if (period === 'PM' && hour !== 12) hour += 12
+          if (period === 'AM' && hour === 12) hour = 0
+          const endHour = (hour + 1) % 24
+          const endHour12 = endHour > 12 ? endHour - 12 : endHour === 0 ? 12 : endHour
+          const endAmpm = endHour >= 12 ? 'PM' : 'AM'
+          return `${endHour12}:${minutes} ${endAmpm}`
+          })()
+        : '04:15 AM',
+      }))
+      setAnytime(!initialTime)
+  }, [isOpen, initialDate, initialTime, initialClientId, invoiceOnly])
 
   useEffect(() => {
     if (!isOpen || !taskOnly) return
@@ -265,6 +405,7 @@ export default function AddWorkorderModal({
       setFormData(prev => ({
         ...prev,
         client: editingTask.clientName,
+        clientId: null,
         address: editingTask.address ?? '',
         title: editingTask.title,
         instructions: editingTask.instructions ?? '',
@@ -283,7 +424,7 @@ export default function AddWorkorderModal({
     }
   }, [isOpen, taskOnly, editingTask])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (quoteOnly) {
       const clientMatch = mockClients.find(c => c.name === formData.client)
@@ -338,54 +479,61 @@ export default function AddWorkorderModal({
       return
     }
     if (invoiceOnly) {
-      const clientMatch = mockClients.find(c => c.name === formData.client)
-      const clientId = clientMatch?.id ?? 1
-      const clientName = formData.client || (clientMatch?.name ?? '')
-      const lineItems = formData.lineItems.map(item => ({
-        name: item.name,
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice ?? 0,
-        unitCost: 0,
-        total: (item.quantity || 1) * (item.unitPrice ?? 0),
-      }))
-      const subtotal = lineItems.reduce((sum, i) => sum + i.total, 0)
-      const newId = mockWorkorders.length > 0 ? Math.max(...mockWorkorders.map((w: { id: number }) => w.id)) + 1 : 1
-      const newWo = {
-        id: newId,
-        title: formData.title || 'Invoice',
-        clientId,
-        clientName,
-        address: formData.address || '',
-        schedule: { day: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00' },
-        assignedTeamMember: '',
-        instructions: '',
-        lineItems,
-        subtotal,
-        discount: 0,
-        discountType: 'amount' as const,
-        tax: 0,
-        total: subtotal,
-        cost: 0,
-        estimateMargin: subtotal,
-        expenses: [],
-        notes: '',
-        quoteStatus: 'approved' as const,
-        quoteNumber: `Q-${newId}`,
-        quoteDateSent: format(new Date(), 'yyyy-MM-dd'),
-        quoteWhatsappStatus: 'sent',
-        invoiceStatus: 'not sent' as const,
-        invoiceNumber: '',
-        invoiceDateSent: '',
-        invoiceWhatsappStatus: '',
-        jobStatus: 'Completed' as const,
-        payments: [],
-        createdAt: format(new Date(), 'yyyy-MM-dd'),
-        lastModified: format(new Date(), 'yyyy-MM-dd'),
+      const titleTrim = (formData.title || '').trim()
+      const addressTrim = (formData.address || '').trim()
+      if (formData.clientId == null || formData.clientId === '') {
+        alert('Please select a client from the list.')
+        return
       }
-      mockWorkorders.push(newWo as never)
-      alert('Invoice saved. Work order created.')
-      onClose()
-      setFormData(defaultFormState())
+      if (!addressTrim) {
+        alert('Address is required.')
+        return
+      }
+      if (!titleTrim) {
+        alert('Title is required.')
+        return
+      }
+      setInvoiceSubmitting(true)
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+        const body: Record<string, unknown> = {
+          clientId: formData.clientId,
+          title: titleTrim,
+          address: addressTrim,
+        }
+        if (formData.lineItems.length > 0) {
+          body.lineItems = formData.lineItems.map((item) => ({
+            name: (item.name || '').trim() || '—',
+            itemType: 'SERVICE' as const,
+            description: (item.description || '').trim() || null,
+            quantity: Number(item.quantity) || 0,
+            price: Number(item.unitPrice) || 0,
+        cost: 0,
+          }))
+        }
+        const res = await fetch(`${baseUrl}/api/invoices`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const msg =
+            (data as { message?: string }).message ??
+            (data as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+            `Failed to create invoice (${res.status})`
+          alert(msg)
+          return
+        }
+        alert('Invoice created successfully.')
+        onClose()
+        setFormData(defaultFormState())
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to create invoice')
+      } finally {
+        setInvoiceSubmitting(false)
+      }
       return
     }
     if (!anytime && formData.endTime && !isEndValid) {
@@ -446,7 +594,7 @@ export default function AddWorkorderModal({
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
       <div className="absolute inset-0 bg-neutral-dark bg-opacity-20 pointer-events-auto" onClick={onClose} />
-      <div
+      <div 
         className="relative bg-white rounded-lg shadow-2xl w-[320px] overflow-hidden flex flex-col pointer-events-auto border border-neutral-light"
         style={{ ...getModalStyle(), maxHeight: 'min(560px, 85vh)' }}
         onClick={(e) => e.stopPropagation()}
@@ -462,8 +610,9 @@ export default function AddWorkorderModal({
           onClose={onClose}
         />
 
-        <div className="flex-1 overflow-y-auto p-2.5">
-          <form onSubmit={handleSubmit} className="space-y-2.5">
+        <div className="flex flex-col flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2.5">
             <AddWorkorderModalClientSection
               formData={formData}
               setFormData={setFormData}
@@ -472,12 +621,26 @@ export default function AddWorkorderModal({
               setIsClientDropdownOpen={setIsClientDropdownOpen}
               clientDropdownRef={clientDropdownRef}
               filteredClients={filteredClientsForModal}
-              onOpenAddClient={() => setIsAddClientOpen(true)}
+              onOpenAddClient={invoiceOnly ? () => router.push('/clients') : () => setIsAddClientOpen(true)}
+              clientSearchVariant={invoiceOnly ? 'invoice' : 'default'}
+              clientsLoading={invoiceOnly && clientsLoading}
             />
 
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Address</label>
-              <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.6 }}>Fetched from last registered workorder or task of selected client</p>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
+                {invoiceOnly ? (
+                  <>
+                    Address <span className="text-red-500">*</span>
+                  </>
+                ) : (
+                  'Address'
+                )}
+              </label>
+              <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.6 }}>
+                {invoiceOnly
+                  ? 'Required. Prefilled when you select a client; you can edit it for this invoice.'
+                  : 'Fetched from last registered workorder or task of selected client'}
+              </p>
               <input
                 type="text"
                 name="address"
@@ -490,7 +653,15 @@ export default function AddWorkorderModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>Title</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
+                {invoiceOnly ? (
+                  <>
+                    Title <span className="text-red-500">*</span>
+                  </>
+                ) : (
+                  'Title'
+                )}
+              </label>
               <input
                 type="text"
                 name="title"
@@ -543,6 +714,9 @@ export default function AddWorkorderModal({
               addLineItemProducts={addLineItemProducts}
               addLineItemFiltered={addLineItemFiltered}
               onAddLineItemSelect={addLineItemSelect}
+              lineItemsSectionLabel={invoiceOnly ? 'Line items (Optional)' : null}
+              onNavigateCreatePriceItem={invoiceOnly ? () => router.push('/settings?section=products') : undefined}
+              priceListLoading={invoiceOnly && priceListLoading}
             />
 
             <AddWorkorderModalScheduleSection
@@ -563,6 +737,7 @@ export default function AddWorkorderModal({
               isEndValid={isEndValid}
               onRemoveEndTime={removeTime}
             />
+                </div>
 
             <AddWorkorderModalFooter
               documentOnly={documentOnly}
@@ -573,6 +748,7 @@ export default function AddWorkorderModal({
               onClose={onClose}
               formData={formData}
               anytime={anytime}
+              isSubmitting={invoiceOnly && invoiceSubmitting}
             />
           </form>
         </div>
@@ -590,10 +766,10 @@ export default function AddWorkorderModal({
               setCurrentMonth={setStartDatePickerMonth}
               selectedDateStr={formData.startDate}
               onSelectDate={(day) => {
-                setFormData(prev => ({ ...prev, startDate: format(day, 'MMM d, yyyy') }))
-                setStartDatePickerMonth(day)
-                setIsStartDateCalendarOpen(false)
-              }}
+                          setFormData(prev => ({ ...prev, startDate: format(day, 'MMM d, yyyy') }))
+                          setStartDatePickerMonth(day)
+                          setIsStartDateCalendarOpen(false)
+                        }}
               onClose={() => setIsStartDateCalendarOpen(false)}
             />
           )}
@@ -620,7 +796,12 @@ export default function AddWorkorderModal({
         onClose={() => setIsAddClientOpen(false)}
         mode="new"
         onSuccess={(data) => {
-          setFormData(prev => ({ ...prev, client: data.name, address: data.address || prev.address }))
+          setFormData((prev) => ({
+            ...prev,
+            client: data.name,
+            clientId: null,
+            address: data.address || prev.address,
+          }))
         }}
       />
     </div>

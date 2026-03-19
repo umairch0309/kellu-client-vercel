@@ -15,12 +15,42 @@ export default function NewClientForm() {
     leadSource: '',
     notes: '',
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would save to the backend
-    alert('Client created successfully! (Static UI)')
-    router.push('/clients')
+    setSubmitError(null)
+    setIsSubmitting(true)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    const body: Record<string, string> = {
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+    }
+    if (formData.uniqueIdentifier.trim()) body.uniqueIdentifier = formData.uniqueIdentifier.trim()
+    if (formData.email.trim()) body.email = formData.email.trim()
+    if (formData.documentNumber.trim()) body.documentNumber = formData.documentNumber.trim()
+    if (formData.leadSource.trim()) body.leadSource = formData.leadSource.trim()
+    if (formData.notes.trim()) body.notes = formData.notes.trim()
+    try {
+      const res = await fetch(`${baseUrl}/api/clients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message = (data as { message?: string }).message ?? `Request failed (${res.status})`
+        setSubmitError(message)
+        return
+      }
+      router.push('/clients')
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create client')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -54,6 +84,11 @@ export default function NewClientForm() {
 
       {/* Form */}
       <div className="bg-white rounded shadow-sm border p-3 max-w-2xl mx-auto" style={{ borderColor: '#EAEBED' }}>
+        {submitError && (
+          <div className="mb-3 px-2.5 py-2 rounded text-xs bg-red-50 border border-red-200" style={{ color: '#B91C1C' }}>
+            {submitError}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Unique Identifier - for internal purposes only, not shown elsewhere */}
           <div>
@@ -257,11 +292,14 @@ export default function NewClientForm() {
             </button>
             <button
               type="submit"
-              className="px-3 py-1 rounded transition-all flex items-center gap-1.5 text-xs text-white shadow-sm hover:shadow-md"
+              disabled={isSubmitting}
+              className="px-3 py-1 rounded transition-all flex items-center gap-1.5 text-xs text-white shadow-sm hover:shadow-md disabled:opacity-70 disabled:pointer-events-none"
               style={{ backgroundColor: '#28AFB0' }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#1E8A8B'
-                e.currentTarget.style.transform = 'translateY(-1px)'
+                if (!isSubmitting) {
+                  e.currentTarget.style.backgroundColor = '#1E8A8B'
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = '#28AFB0'
@@ -269,7 +307,7 @@ export default function NewClientForm() {
               }}
             >
               <FiSave size={14} />
-              <span>Save Client</span>
+              <span>{isSubmitting ? 'Saving…' : 'Save Client'}</span>
             </button>
           </div>
         </form>

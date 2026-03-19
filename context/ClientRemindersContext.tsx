@@ -8,12 +8,12 @@ export type CustomerReminder = {
   note: string
 }
 
-type RemindersState = Record<number, CustomerReminder>
+type RemindersState = Record<string, CustomerReminder>
 
 type ContextValue = {
-  getReminder: (clientId: number) => CustomerReminder | null
-  setReminder: (clientId: number, reminder: CustomerReminder) => void
-  deleteReminder: (clientId: number) => void
+  getReminder: (clientId: number | string) => CustomerReminder | null
+  setReminder: (clientId: number | string, reminder: CustomerReminder) => void
+  deleteReminder: (clientId: number | string) => void
   isReminderDue: (reminder: CustomerReminder) => boolean
 }
 
@@ -22,16 +22,16 @@ const ClientRemindersContext = createContext<ContextValue | null>(null)
 export function ClientRemindersProvider({ children }: { children: ReactNode }) {
   const [reminders, setReminders] = useState<RemindersState>({})
 
-  const getReminder = useCallback((clientId: number) => reminders[clientId] ?? null, [reminders])
+  const getReminder = useCallback((clientId: number | string) => reminders[String(clientId)] ?? null, [reminders])
 
-  const setReminder = useCallback((clientId: number, reminder: CustomerReminder) => {
-    setReminders(prev => ({ ...prev, [clientId]: reminder }))
+  const setReminder = useCallback((clientId: number | string, reminder: CustomerReminder) => {
+    setReminders(prev => ({ ...prev, [String(clientId)]: reminder }))
   }, [])
 
-  const deleteReminder = useCallback((clientId: number) => {
+  const deleteReminder = useCallback((clientId: number | string) => {
     setReminders(prev => {
       const next = { ...prev }
-      delete next[clientId]
+      delete next[String(clientId)]
       return next
     })
   }, [])

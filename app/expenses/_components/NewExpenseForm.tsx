@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiSave, FiChevronLeft, FiUpload, FiX } from 'react-icons/fi'
 import { format } from 'date-fns'
-import { mockWorkorders, mockClients } from '@/data/mockData'
+import type { WorkorderRow } from '@/app/workorders/_components/WorkordersTable'
+import { fetchWorkordersList, formatWorkorderOptionLabel } from '@/lib/workordersListApi'
 
 interface NewExpenseFormProps {
-  workorderId?: number
+  workorderId?: string | number
 }
 
 export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}) {
@@ -16,27 +17,64 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
   const [isWorkorderDropdownOpen, setIsWorkorderDropdownOpen] = useState(false)
   const workorderDropdownRef = useRef<HTMLDivElement>(null)
 
+  const [apiWorkorders, setApiWorkorders] = useState<WorkorderRow[]>([])
+  const [workordersLoading, setWorkordersLoading] = useState(true)
+  const [workordersError, setWorkordersError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     itemName: '',
     details: '',
     total: 0,
-    linkedWorkorder: workorderId || null as number | null,
+    linkedWorkorder: (workorderId ?? null) as string | number | null,
     invoiceNumber: '',
     attachment: null as File | null,
   })
 
-  // Get workorder data if linked
-  const linkedWorkorder = formData.linkedWorkorder ? mockWorkorders.find(wo => wo.id === formData.linkedWorkorder) : null
+  useEffect(() => {
+    let cancelled = false
+    setWorkordersLoading(true)
+    setWorkordersError(null)
+    fetchWorkordersList({ limit: 500 })
+      .then((list) => {
+        if (!cancelled) setApiWorkorders(list)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setWorkordersError(err instanceof Error ? err.message : 'Failed to load work orders')
+          setApiWorkorders([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setWorkordersLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  // Filter workorders based on search
-  const filteredWorkorders = mockWorkorders.filter(wo =>
-    wo.title.toLowerCase().includes(workorderSearchTerm.toLowerCase()) ||
-    wo.clientName.toLowerCase().includes(workorderSearchTerm.toLowerCase()) ||
-    `#${wo.id}`.includes(workorderSearchTerm)
-  )
+  const linkedWorkorderRow = useMemo(() => {
+    if (formData.linkedWorkorder == null) return null
+    return apiWorkorders.find((wo) => String(wo.id) === String(formData.linkedWorkorder)) ?? null
+  }, [formData.linkedWorkorder, apiWorkorders])
 
-  // Close dropdown when clicking outside
+  const searchLower = workorderSearchTerm.toLowerCase().trim()
+  const filteredWorkorders = useMemo(() => {
+    return apiWorkorders.filter((wo) => {
+      if (!searchLower) return true
+      return (
+        wo.title.toLowerCase().includes(searchLower) ||
+        wo.clientName.toLowerCase().includes(searchLower) ||
+        String(wo.id).toLowerCase().includes(searchLower) ||
+        (wo.workOrderNumber != null && String(wo.workOrderNumber).toLowerCase().includes(searchLower))
+      )
+    })
+  }, [apiWorkorders, searchLower])
+
+  const workorderFieldDisplay =
+    workorderSearchTerm ||
+    (linkedWorkorderRow ? formatWorkorderOptionLabel(linkedWorkorderRow) : '')
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (workorderDropdownRef.current && !workorderDropdownRef.current.contains(event.target as Node)) {
@@ -61,15 +99,14 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
     router.push('/expenses')
   }
 
-  const handleWorkorderSelect = (woId: number) => {
-    setFormData({ ...formData, linkedWorkorder: woId })
+  const handleWorkorderSelect = (wo: WorkorderRow) => {
+    setFormData((prev) => ({ ...prev, linkedWorkorder: wo.id }))
     setIsWorkorderDropdownOpen(false)
     setWorkorderSearchTerm('')
   }
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
       <div className="bg-white border-b" style={{ borderColor: '#EAEBED' }}>
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
@@ -87,19 +124,20 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
               <FiChevronLeft size={20} />
             </button>
             <div className="h-1 w-8 rounded-full" style={{ backgroundColor: '#28AFB0' }}></div>
-            <h1 className="text-xl font-bold" style={{ color: '#1F271B' }}>New Expense</h1>
+            <h1 className="text-xl font-bold" style={{ color: '#1F271B' }}>
+              New Expense
+            </h1>
           </div>
         </div>
       </div>
 
-      {/* Form Content */}
       <div className="max-w-4xl mx-auto px-4 py-4">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Expense Details Section */}
           <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Expense Details</h2>
+            <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>
+              Expense Details
+            </h2>
             <div className="space-y-3">
-              {/* Date */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Date <span className="text-red-500">*</span>
@@ -122,7 +160,6 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                 />
               </div>
 
-              {/* Item Name */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Item name <span className="text-red-500">*</span>
@@ -146,7 +183,6 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                 />
               </div>
 
-              {/* Details */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Details
@@ -169,7 +205,6 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                 />
               </div>
 
-              {/* Total */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Total <span className="text-red-500">*</span>
@@ -195,20 +230,19 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                 />
               </div>
 
-              {/* Linked Workorder */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
-                  Linked Work order (when applies)
+                  Linked work order <span style={{ color: '#6B7280', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <div className="relative" ref={workorderDropdownRef}>
                   <input
                     type="text"
-                    value={workorderSearchTerm || (linkedWorkorder ? `WO #${linkedWorkorder.id} - ${linkedWorkorder.title}` : '')}
+                    value={workorderFieldDisplay}
                     onChange={(e) => {
                       setWorkorderSearchTerm(e.target.value)
                       setIsWorkorderDropdownOpen(true)
                     }}
-                    placeholder="Search workorder..."
+                    placeholder="Search work order…"
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 text-sm transition-all"
                     style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                     onFocus={() => setIsWorkorderDropdownOpen(true)}
@@ -217,47 +251,68 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                       e.currentTarget.style.boxShadow = 'none'
                     }}
                   />
-                  {isWorkorderDropdownOpen && filteredWorkorders.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto" style={{ borderColor: '#EAEBED' }}>
+                  {isWorkorderDropdownOpen && (
+                    <div
+                      className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto"
+                      style={{ borderColor: '#EAEBED' }}
+                    >
                       <button
                         type="button"
                         onClick={() => {
-                          setFormData({ ...formData, linkedWorkorder: null })
+                          setFormData((prev) => ({ ...prev, linkedWorkorder: null }))
                           setWorkorderSearchTerm('')
                           setIsWorkorderDropdownOpen(false)
                         }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-b"
-                        style={{ color: '#1F271B', backgroundColor: formData.linkedWorkorder === null ? '#F3F4F6' : 'white', borderBottomColor: '#EAEBED' }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b transition-colors"
+                        style={{ color: '#1F271B', borderBottomColor: '#EAEBED' }}
                       >
-                        None (Global Expense)
+                        None (global expense)
                       </button>
-                      {filteredWorkorders.map((wo) => (
-                        <button
-                          key={wo.id}
-                          type="button"
-                          onClick={() => handleWorkorderSelect(wo.id)}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-opacity-50 transition-colors border-b"
-                          style={{ 
-                            color: '#1F271B', 
-                            backgroundColor: formData.linkedWorkorder === wo.id ? '#F3F4F6' : 'white',
-                            borderBottomColor: '#EAEBED'
-                          }}
-                        >
-                          <div className="font-medium">WO #{wo.id} - {wo.title}</div>
-                          <div className="text-[10px]" style={{ color: '#1F271B', opacity: 0.6 }}>{wo.clientName}</div>
-                        </button>
-                      ))}
+                      {workordersLoading && (
+                        <div className="px-3 py-2 text-xs" style={{ color: '#6B7280' }}>
+                          Loading work orders…
+                        </div>
+                      )}
+                      {workordersError && !workordersLoading && (
+                        <div className="px-3 py-2 text-xs" style={{ color: '#B91C1C' }}>
+                          {workordersError}
+                        </div>
+                      )}
+                      {!workordersLoading &&
+                        !workordersError &&
+                        filteredWorkorders.length === 0 && (
+                          <div className="px-3 py-2 text-xs" style={{ color: '#6B7280' }}>
+                            No work orders match your search.
+                          </div>
+                        )}
+                      {!workordersLoading &&
+                        !workordersError &&
+                        filteredWorkorders.map((wo) => (
+                          <button
+                            key={String(wo.id)}
+                            type="button"
+                            onClick={() => handleWorkorderSelect(wo)}
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 border-b transition-colors"
+                            style={{
+                              color: '#1F271B',
+                              borderBottomColor: '#EAEBED',
+                              backgroundColor:
+                                String(formData.linkedWorkorder) === String(wo.id) ? '#F3F4F6' : 'white',
+                            }}
+                          >
+                            {formatWorkorderOptionLabel(wo)}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
-                {linkedWorkorder && (
+                {linkedWorkorderRow && (
                   <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.7 }}>
-                    Linked to: {linkedWorkorder.title} ({linkedWorkorder.clientName})
+                    Linked to: {linkedWorkorderRow.title} ({linkedWorkorderRow.clientName})
                   </p>
                 )}
               </div>
 
-              {/* Invoice Number */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Invoice number
@@ -280,13 +335,13 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
                 />
               </div>
 
-              {/* Attachment */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>
                   Attachment (invoice)
                 </label>
                 <div className="flex items-center gap-3">
-                  <label className="flex-1 px-3 py-2 border rounded cursor-pointer flex items-center justify-center gap-2 text-sm transition-all hover:bg-gray-50"
+                  <label
+                    className="flex-1 px-3 py-2 border rounded cursor-pointer flex items-center justify-center gap-2 text-sm transition-all hover:bg-gray-50"
                     style={{ borderColor: '#EAEBED', color: '#1F271B' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = '#28AFB0'
@@ -335,7 +390,6 @@ export default function NewExpenseForm({ workorderId }: NewExpenseFormProps = {}
             </div>
           </div>
 
-          {/* Form Footer */}
           <div className="flex items-center justify-end gap-3 pt-4">
             <button
               type="button"

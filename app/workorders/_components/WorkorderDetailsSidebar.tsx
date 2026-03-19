@@ -9,11 +9,11 @@ export interface WorkorderDetailsSidebarProps {
   jobReportPdfUrl: string | null
   jobReportSentAt: string | null
   tallyWorkReportSentAt: string | null
-  getReminder: (clientId: number) => CustomerReminder | null
+  getReminder: (clientId: number | string) => CustomerReminder | null
   isReminderDue: (r: CustomerReminder) => boolean
   onSetReminderOpen: () => void
   onEditReminder: () => void
-  deleteReminder: (clientId: number) => void
+  deleteReminder: (clientId: number | string) => void
 }
 
 export default function WorkorderDetailsSidebar({

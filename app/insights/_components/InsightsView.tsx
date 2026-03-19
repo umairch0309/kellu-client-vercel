@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { format, subYears, startOfYear, endOfYear, startOfMonth, endOfMonth, subMonths, subWeeks, isWithinInterval, parseISO, getMonth, getYear } from 'date-fns'
 import { FiCalendar } from 'react-icons/fi'
 import { mockWorkorders } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 
 type TabId = 'revenue' | 'lead_conversion' | 'jobs' | 'invoices'
 type DateRangePreset = 'last_12_weeks' | 'this_year_to_date' | 'last_12_months' | 'last_year_to_date'
@@ -288,7 +289,7 @@ export default function InsightsView() {
           </div>
           <div className="rounded-lg border p-4 shadow-sm" style={{ borderColor: '#EAEBED', backgroundColor: '#fff' }}>
             <p className="text-sm font-medium" style={{ color: '#1F271B', opacity: 0.8 }}>Invoiced value</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: '#1F271B' }}>${overviewKpis.invoicedValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            <p className="text-2xl font-bold mt-1" style={{ color: '#1F271B' }}>{formatUsd(overviewKpis.invoicedValue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
           </div>
         </div>
       </section>
@@ -366,7 +367,7 @@ export default function InsightsView() {
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#28AFB0' }} />
               <span className="text-sm font-semibold" style={{ color: '#1F271B' }}>
-                ${(chartData.totals[2026] ?? 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                {formatUsd(chartData.totals[2026] ?? 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
               </span>
               <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>2026</span>
             </div>
@@ -401,14 +402,14 @@ export default function InsightsView() {
                       <div
                         className="w-4 rounded-t"
                         style={{ height: Math.max(4, v2025 * scale), backgroundColor: '#7C3AED' }}
-                        title={`2025: ${chartData.format === 'currency' ? '$' + v2025.toFixed(0) : v2025}`}
+                        title={`2025: ${chartData.format === 'currency' ? formatUsd(v2025, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : v2025}`}
                       />
                     )}
                     {v2026 > 0 && (
                       <div
                         className="w-4 rounded-t"
                         style={{ height: Math.max(4, v2026 * scale), backgroundColor: '#28AFB0' }}
-                        title={`2026: ${chartData.format === 'currency' ? '$' + v2026.toFixed(0) : v2026}`}
+                        title={`2026: ${chartData.format === 'currency' ? formatUsd(v2026, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : v2026}`}
                       />
                     )}
                   </div>

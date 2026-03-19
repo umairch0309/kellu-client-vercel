@@ -57,7 +57,7 @@ export default function SettingsView() {
         {activeSection === 'schedule' && <ScheduleSettings />}
         {activeSection === 'products' && <ServicesSettings />}
         {activeSection === 'communications' && <CommunicationsSettings />}
-        {activeSection === 'team' && <TeamSettings roleOptions={['Admin / Owner (Service company)', 'Technician']} />}
+        {activeSection === 'team' && <TeamSettings />}
         {activeSection === 'roles' && <RolesPermissionsSettings />}
       </main>
     </div>

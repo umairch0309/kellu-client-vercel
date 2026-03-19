@@ -1,6 +1,7 @@
 'use client'
 
 import { FiChevronRight, FiTrendingUp } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 
 export interface OverviewLink {
   status: string
@@ -117,7 +118,7 @@ export default function QuotesOverviewCards({
               </span>
             )}
           </div>
-          <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.8 }}>Rs{sentTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+          <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.8 }}>{formatUsd(sentTotalValue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ export default function QuotesOverviewCards({
             <span className="text-2xl font-bold" style={{ color: '#1F271B' }}>{convertedPast30Count}</span>
             <span className="text-sm" style={{ color: '#1F271B', opacity: 0.6 }}>{convertedPast30Count > 0 ? '0%' : ''}</span>
           </div>
-          <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.8 }}>Rs{convertedTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+          <p className="text-xs mt-1" style={{ color: '#1F271B', opacity: 0.8 }}>{formatUsd(convertedTotalValue, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
         </div>
       </div>
     </div>

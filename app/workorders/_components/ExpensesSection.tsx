@@ -2,10 +2,11 @@
 
 import { FiPlus } from 'react-icons/fi'
 import { format } from 'date-fns'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { ExpenseForm } from './workorderDetailTypes'
 
 export interface ExpensesSectionProps {
-  workorderId: number
+  workorderId: number | string
   editedExpenses: any[]
   onAddExpense: () => void
   onEditExpense: (index: number, exp: any) => void
@@ -52,7 +53,7 @@ export default function ExpensesSection({ workorderId, editedExpenses, onAddExpe
                 >
                   <td className="py-2 px-2" style={{ color: '#1F271B' }}>{exp.date ? format(new Date(exp.date), 'MMM d, yyyy') : '—'}</td>
                   <td className="py-2 px-2" style={{ color: '#1F271B' }}>{exp.itemName || '—'}</td>
-                  <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>Rs{(exp.total ?? exp.amount ?? 0).toFixed(2)}</td>
+                  <td className="py-2 px-2 text-right tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(Number(exp.total) || Number(exp.amount) || 0)}</td>
                 </tr>
               ))}
             </tbody>

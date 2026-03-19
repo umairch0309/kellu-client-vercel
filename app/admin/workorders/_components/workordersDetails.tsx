@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Briefcase, DollarSign, Building2, User, Calendar, Clock } from "lucide-react";
+import { formatUsd } from "@/lib/formatCurrency";
 
 type JobStatus = "active" | "completed" | "pending" | "cancelled";
 
@@ -59,7 +60,7 @@ export default function WorkorderDetails() {
   const color = getStatusColor(workorder.status);
 
   const stats = [
-    { label: "Amount", value: `$${workorder.amount.toLocaleString()}`, icon: DollarSign },
+    { label: "Amount", value: formatUsd(workorder.amount), icon: DollarSign },
     { label: "Status", value: workorder.status.charAt(0).toUpperCase() + workorder.status.slice(1), icon: Briefcase },
     { label: "Business", value: workorder.business, icon: Building2 },
     { label: "Created", value: workorder.createdDate, icon: Calendar },

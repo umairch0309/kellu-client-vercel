@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiSearch, FiChevronDown, FiChevronRight, FiTrendingUp } from 'react-icons/fi'
+import { formatUsd, formatUsdCompact } from '@/lib/formatCurrency'
 
 type InvoiceStatus = 'paid' | 'overdue' | 'pending' | 'draft'
 
@@ -38,10 +39,7 @@ const getStatusColor = (status: InvoiceStatus) => {
   return { bg: '#F3F4F6', text: '#1F271B' }
 }
 
-const formatAmount = (n: number) => {
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`
-  return `$${n.toLocaleString()}`
-}
+const formatAmount = (n: number) => formatUsdCompact(n)
 
 export function AdminInvoices() {
   const router = useRouter()
@@ -266,7 +264,7 @@ export function AdminInvoices() {
                       <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.id}</p></td>
                       <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{invoice.business}</p></td>
                       <td className="px-3 py-2"><p className="text-xs font-medium" style={{ color: '#1F271B' }}>{invoice.client}</p></td>
-                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${invoice.amount.toLocaleString()}</p></td>
+                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>{formatUsd(invoice.amount)}</p></td>
                       <td className="px-3 py-2">
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium" style={{ backgroundColor: color.bg, color: color.text }}>
                           {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}

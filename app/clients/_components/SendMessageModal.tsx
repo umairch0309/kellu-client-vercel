@@ -50,7 +50,7 @@ function renderPreview(text: string, clientName: string): string {
 interface SendMessageModalProps {
   isOpen: boolean
   onClose: () => void
-  clientIds: number[]
+  clientIds: (number | string)[]
   onSent?: () => void
 }
 
@@ -69,7 +69,7 @@ export default function SendMessageModal({
   const variableDropdownRef = useRef<HTMLDivElement>(null)
 
   const clients = clientIds
-    .map(id => mockClients.find(c => c.id === id))
+    .map(id => mockClients.find(c => c.id === id || String(c.id) === String(id)))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
   const isMultiple = clients.length > 1
   const previewClientName = clients[0]?.name ?? 'Client'

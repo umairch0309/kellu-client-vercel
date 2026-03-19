@@ -10,7 +10,7 @@ export default function EditWorkorderPage({ params }: { params: Promise<{ id: st
   return (
     <ProtectedRoute>
       <Layout>
-        <NewWorkorderForm workorderId={parseInt(id)} />
+        <NewWorkorderForm workorderId={id} />
       </Layout>
     </ProtectedRoute>
   )

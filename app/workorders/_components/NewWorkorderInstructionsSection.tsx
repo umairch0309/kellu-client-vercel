@@ -8,7 +8,7 @@ export interface NewWorkorderInstructionsSectionProps {
 export default function NewWorkorderInstructionsSection({ instructions, onFieldChange }: NewWorkorderInstructionsSectionProps) {
   return (
     <div className="bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Instructions</h2>
+      <h2 className="text-sm font-semibold mb-3" style={{ color: '#1F271B' }}>Instructions <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional)</span></h2>
       <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Instructions</label>
       <textarea
         name="instructions"

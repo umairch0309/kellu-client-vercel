@@ -2,6 +2,7 @@
 
 import { FiPlus, FiInfo, FiCheckCircle } from 'react-icons/fi'
 import { mockMaterialsList } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { LineItemForm } from './workorderDetailTypes'
 
 export interface AddLineItemFormProps {
@@ -10,7 +11,8 @@ export interface AddLineItemFormProps {
   lineItemError: string
   setLineItemError: (s: string) => void
   onCancel: () => void
-  onSave: () => void
+  onSave: () => void | Promise<void>
+  saving?: boolean
   onOpenCreateProduct: () => void
   lineItemNameDropdownRef: React.RefObject<HTMLDivElement>
 }
@@ -22,6 +24,7 @@ export default function AddLineItemForm({
   setLineItemError,
   onCancel,
   onSave,
+  saving = false,
   onOpenCreateProduct,
   lineItemNameDropdownRef,
 }: AddLineItemFormProps) {
@@ -67,7 +70,7 @@ export default function AddLineItemForm({
                 >
                   <div className="flex justify-between items-start gap-2">
                     <span className="font-medium">{m.name}</span>
-                    <span className="text-xs font-medium flex-shrink-0" style={{ opacity: 0.9 }}>Rs{(m.unitPrice ?? 0).toFixed(2)}</span>
+                    <span className="text-xs font-medium flex-shrink-0" style={{ opacity: 0.9 }}>{formatUsd(m.unitPrice ?? 0)}</span>
                   </div>
                   {m.description && (
                     <div className="text-xs mt-0.5 truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{m.description}</div>
@@ -139,26 +142,30 @@ export default function AddLineItemForm({
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Total</label>
             <div className="px-2 py-2 border rounded text-sm text-center font-semibold" style={{ borderColor: '#EAEBED', backgroundColor: '#F3F4F6', color: '#1F271B' }}>
-              Rs{(newLineItem.quantity * newLineItem.unitPrice).toFixed(2)}
+              {formatUsd(newLineItem.quantity * newLineItem.unitPrice)}
             </div>
           </div>
         </div>
       </div>
       <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t" style={{ borderTopColor: '#EAEBED' }}>
         <button
+          type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 border rounded text-xs font-medium transition-all"
+          disabled={saving}
+          className="px-3 py-1.5 border rounded text-xs font-medium transition-all disabled:opacity-50"
           style={{ borderColor: '#EAEBED', color: '#1F271B', backgroundColor: 'white' }}
         >
           Cancel
         </button>
         <button
-          onClick={onSave}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+          type="button"
+          onClick={() => void onSave()}
+          disabled={saving}
+          className="px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5 disabled:opacity-50"
           style={{ backgroundColor: '#28AFB0', color: 'white' }}
         >
           <FiCheckCircle size={14} />
-          <span>Save</span>
+          <span>{saving ? 'Saving…' : 'Save'}</span>
         </button>
       </div>
     </div>

@@ -1,10 +1,11 @@
 'use client'
 
 import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { formatUsd } from '@/lib/formatCurrency'
 import type { AddWorkorderFormData, LineItemForm } from './addWorkorderModalTypes'
 
 export interface MasterPriceItem {
-  id: number
+  id: number | string
   name: string
   description?: string
   price: number
@@ -25,6 +26,11 @@ export interface AddWorkorderModalLineItemsSectionProps {
   addLineItemProducts: MasterPriceItem[]
   addLineItemFiltered: MasterPriceItem[]
   onAddLineItemSelect: (item: { name: string; description: string; price: number }) => void
+  /** Shown above the add button (e.g. invoice: "Line items (Optional)") */
+  lineItemsSectionLabel?: string | null
+  /** Footer link in the dropdown (e.g. go to Settings → products) */
+  onNavigateCreatePriceItem?: () => void
+  priceListLoading?: boolean
 }
 
 export default function AddWorkorderModalLineItemsSection({
@@ -41,11 +47,19 @@ export default function AddWorkorderModalLineItemsSection({
   addLineItemProducts,
   addLineItemFiltered,
   onAddLineItemSelect,
+  lineItemsSectionLabel,
+  onNavigateCreatePriceItem,
+  priceListLoading = false,
 }: AddWorkorderModalLineItemsSectionProps) {
   if (!show) return null
 
   return (
     <div ref={lineItemsSectionRef} className="space-y-3">
+      {lineItemsSectionLabel ? (
+        <div className="text-xs font-medium" style={{ color: '#1F271B' }}>
+          {lineItemsSectionLabel}
+        </div>
+      ) : null}
       <div ref={addLineItemDropdownRef} className="relative">
         <button
           type="button"
@@ -72,7 +86,12 @@ export default function AddWorkorderModalLineItemsSection({
               />
             </div>
             <div className="max-h-56 overflow-y-auto">
-              {addLineItemServices.length > 0 && (
+              {priceListLoading && (
+                <div className="px-3 py-4 text-sm" style={{ color: '#6B7280' }}>
+                  Loading price list…
+                </div>
+              )}
+              {!priceListLoading && addLineItemServices.length > 0 && (
                 <div className="py-1">
                   <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide" style={{ color: '#6B7280' }}>Service</div>
                   {addLineItemServices.map((item) => (
@@ -85,7 +104,7 @@ export default function AddWorkorderModalLineItemsSection({
                     >
                       <div className="flex justify-between items-start gap-2">
                         <span className="font-medium">{item.name}</span>
-                        <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>${(item.price ?? 0).toFixed(2)}</span>
+                        <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>{formatUsd(item.price ?? 0)}</span>
                       </div>
                       {item.description && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#6B7280' }}>{item.description}</div>
@@ -94,7 +113,7 @@ export default function AddWorkorderModalLineItemsSection({
                   ))}
                 </div>
               )}
-              {addLineItemProducts.length > 0 && (
+              {!priceListLoading && addLineItemProducts.length > 0 && (
                 <div className="py-1 border-t" style={{ borderColor: '#EAEBED' }}>
                   <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide" style={{ color: '#6B7280' }}>Product</div>
                   {addLineItemProducts.map((item) => (
@@ -107,7 +126,7 @@ export default function AddWorkorderModalLineItemsSection({
                     >
                       <div className="flex justify-between items-start gap-2">
                         <span className="font-medium">{item.name}</span>
-                        <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>${(item.price ?? 0).toFixed(2)}</span>
+                        <span className="text-xs font-medium flex-shrink-0" style={{ color: '#6B7280' }}>{formatUsd(item.price ?? 0)}</span>
                       </div>
                       {item.description && (
                         <div className="text-xs mt-0.5 truncate" style={{ color: '#6B7280' }}>{item.description}</div>
@@ -116,10 +135,30 @@ export default function AddWorkorderModalLineItemsSection({
                   ))}
                 </div>
               )}
-              {addLineItemFiltered.length === 0 && (
+              {!priceListLoading && addLineItemFiltered.length === 0 && (
                 <div className="px-3 py-4 text-sm" style={{ color: '#6B7280' }}>No items match your search.</div>
               )}
             </div>
+            {onNavigateCreatePriceItem && (
+              <div className="border-t p-2" style={{ borderColor: '#EAEBED' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigateCreatePriceItem()
+                  }}
+                  className="w-full text-left px-2 py-2 text-xs font-medium rounded transition-colors"
+                  style={{ color: '#28AFB0' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                >
+                  Create new line item in Settings
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -136,7 +175,7 @@ export default function AddWorkorderModalLineItemsSection({
                 {item.description ? (
                   <div className="text-xs mt-0.5 truncate" style={{ color: '#6B7280' }}>{item.description}</div>
                 ) : null}
-                <div className="text-xs mt-1" style={{ color: '#6B7280' }}>${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</div>
+                <div className="text-xs mt-1" style={{ color: '#6B7280' }}>{formatUsd((item.quantity || 0) * (item.unitPrice || 0))}</div>
               </div>
               <button
                 type="button"

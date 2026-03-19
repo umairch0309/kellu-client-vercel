@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, FileText, DollarSign, Building2, User, Calendar, Clock } from "lucide-react";
+import { formatUsd } from "@/lib/formatCurrency";
 
 type InvoiceStatus = 'paid' | 'overdue' | 'pending' | 'draft';
 
@@ -57,7 +58,7 @@ export default function InvoiceDetails() {
   const color = getStatusColor(invoice.status);
 
   const stats = [
-    { label: "Amount", value: `$${invoice.amount.toLocaleString()}`, icon: DollarSign },
+    { label: "Amount", value: formatUsd(invoice.amount), icon: DollarSign },
     { label: "Status", value: invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1), icon: FileText },
     { label: "Issued", value: invoice.issuedDate, icon: Calendar },
     { label: "Due Date", value: invoice.dueDate, icon: Clock },

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiChevronLeft, FiDownload, FiPaperclip, FiMail, FiMessageCircle, FiFileText } from 'react-icons/fi'
 import { mockClients, mockWorkorders } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 
 interface SendQuotePageProps {
   workorderId: number
@@ -32,14 +33,14 @@ export default function SendQuotePage({ workorderId }: SendQuotePageProps) {
       const balance = totalAmount - paymentsTotal
       const hasPayments = paymentsTotal > 0
       const totalsBlock = hasPayments
-        ? `Total: Rs${totalAmount.toFixed(2)}\nPayments: Rs${paymentsTotal.toFixed(2)}\nBalance: Rs${balance.toFixed(2)}`
-        : `Total: Rs${totalAmount.toFixed(2)}`
+        ? `Total: ${formatUsd(totalAmount)}\nPayments: ${formatUsd(paymentsTotal)}\nBalance: ${formatUsd(balance)}`
+        : `Total: ${formatUsd(totalAmount)}`
       setEmailMessage(`Dear ${client.name || 'Client'},
 
 Please find attached the quotation for ${workorder.title || 'your job'}.
 
 Line Items:
-${workorder.lineItems?.map((item: any) => `- ${item.name}: ${item.quantity} x Rs${item.unitPrice.toFixed(2)} = Rs${item.total.toFixed(2)}`).join('\n') || ''}
+${workorder.lineItems?.map((item: any) => `- ${item.name}: ${item.quantity} x ${formatUsd(Number(item.unitPrice) || 0)} = ${formatUsd(Number(item.total) || 0)}`).join('\n') || ''}
 
 ${totalsBlock}
 

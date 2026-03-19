@@ -1,13 +1,14 @@
 'use client'
 
 import type { ClientListItem } from './clientsListTypes'
+import { getStatusBadgeStyle } from './clientsListTypes'
 
 export interface ClientsMobileListProps {
   clients: ClientListItem[]
-  selectedClientIds: Set<number>
-  onToggleClientSelection: (e: React.MouseEvent, clientId: number) => void
+  selectedClientIds: Set<number | string>
+  onToggleClientSelection: (e: React.MouseEvent, clientId: number | string) => void
   getDisplayStatus: (client: ClientListItem) => string
-  onRowClick: (clientId: number) => void
+  onRowClick: (clientId: number | string) => void
 }
 
 export default function ClientsMobileList({
@@ -41,16 +42,16 @@ export default function ClientsMobileList({
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
               </div>
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2"
-                style={{
-                  backgroundColor: getDisplayStatus(client) === 'Active' ? 'rgba(40, 175, 176, 0.2)' : getDisplayStatus(client) === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
-                  color: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B',
-                }}
-              >
-                <span className="w-1 h-1 rounded-full" style={{ backgroundColor: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B' }} />
-                {getDisplayStatus(client)}
-              </span>
+              {(() => {
+                const status = getDisplayStatus(client)
+                const style = getStatusBadgeStyle(status)
+                return (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ml-2" style={{ backgroundColor: style.backgroundColor, color: style.color }}>
+                    <span className="w-1 h-1 rounded-full" style={{ backgroundColor: style.dotColor }} />
+                    {status}
+                  </span>
+                )
+              })()}
             </div>
             <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.7 }}>
               Last Activity: {client.lastActivity}

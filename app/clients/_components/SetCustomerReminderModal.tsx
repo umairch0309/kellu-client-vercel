@@ -7,7 +7,7 @@ import type { CustomerReminder } from '@/context/ClientRemindersContext'
 interface SetCustomerReminderModalProps {
   isOpen: boolean
   onClose: () => void
-  clientId: number
+  clientId: number | string
   initialReminder?: CustomerReminder | null
   onSave: (reminder: CustomerReminder) => void
 }

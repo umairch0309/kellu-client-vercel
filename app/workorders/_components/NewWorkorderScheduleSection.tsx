@@ -31,7 +31,7 @@ export default function NewWorkorderScheduleSection({
   return (
     <div className="lg:col-span-2 bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Schedule</h2>
+        <h2 className="text-sm font-semibold" style={{ color: '#1F271B' }}>Schedule <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional)</span></h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div>

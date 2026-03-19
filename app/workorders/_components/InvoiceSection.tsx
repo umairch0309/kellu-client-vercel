@@ -1,7 +1,7 @@
 'use client'
 
 export interface InvoiceSectionProps {
-  workorderId: number
+  workorderId: number | string
   invoiceClientMessage: string
   setInvoiceClientMessage: (s: string) => void
   invoiceTermsAndConditions: string

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FiSearch, FiChevronDown } from "react-icons/fi";
+import { formatUsd } from "@/lib/formatCurrency";
 
 const mockJobs = [
   { id: "ORD-1001", business: "ABC Corporation", client: "Downtown Plaza", status: "active" as const, amount: 15400, createdDate: "Feb 15, 2026" },
@@ -164,7 +165,7 @@ export function Workorders() {
               <p className="text-xs font-semibold" style={{ color: '#1F271B' }}>Total Value</p>
             </div>
             <p className="text-sm font-bold" style={{ color: '#1F271B' }}>
-              ${mockJobs.reduce((sum, j) => sum + j.amount, 0).toLocaleString()}
+              {formatUsd(mockJobs.reduce((sum, j) => sum + j.amount, 0))}
             </p>
             <p className="text-[10px]" style={{ color: '#1F271B', opacity: 0.6 }}>across all workorders</p>
           </div>
@@ -289,7 +290,7 @@ export function Workorders() {
                           {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>${job.amount.toLocaleString()}</p></td>
+                      <td className="px-3 py-2 text-right"><p className="text-xs font-semibold" style={{ color: '#1F271B' }}>{formatUsd(job.amount)}</p></td>
                       <td className="px-3 py-2"><p className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{job.createdDate}</p></td>
                     </tr>
                   );

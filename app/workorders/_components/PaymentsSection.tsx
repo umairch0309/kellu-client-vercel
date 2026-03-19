@@ -2,6 +2,21 @@
 
 import { FiPlus } from 'react-icons/fi'
 import { format } from 'date-fns'
+import { formatUsd } from '@/lib/formatCurrency'
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  CASH: 'Cash',
+  CARD: 'Card',
+  TRANSFER: 'Transfer',
+  MERCADOPAGO: 'Mercado Pago',
+  TRANSBANK: 'Transbank',
+  OTHER: 'Other',
+}
+
+function paymentMethodDisplay(method: string | undefined): string {
+  if (!method) return '—'
+  return PAYMENT_METHOD_LABEL[method] ?? method
+}
 
 export interface PaymentsSectionProps {
   editedPayments: any[]
@@ -55,8 +70,8 @@ export default function PaymentsSection({
                 {editedPayments.map((payment: any, index: number) => (
                   <tr key={index} className="border-b" style={{ borderBottomColor: '#EAEBED' }}>
                     <td className="py-2 px-2" style={{ color: '#1F271B' }}>{format(new Date(payment.date), 'MMM dd, yyyy')}</td>
-                    <td className="py-2 px-2" style={{ color: '#1F271B' }}>Rs{payment.amount.toFixed(2)}</td>
-                    <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.method}</td>
+                    <td className="py-2 px-2" style={{ color: '#1F271B' }}>{formatUsd(payment.amount)}</td>
+                    <td className="py-2 px-2" style={{ color: '#1F271B' }}>{paymentMethodDisplay(payment.method)}</td>
                     <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.reference || '—'}</td>
                     <td className="py-2 px-2" style={{ color: '#1F271B' }}>{payment.notes || '—'}</td>
                     <td className="py-2 px-2 text-right">
@@ -71,7 +86,7 @@ export default function PaymentsSection({
             </table>
             <div className="mt-3 pt-3 border-t flex justify-between items-center" style={{ borderTopColor: '#EAEBED' }}>
               <span className="text-sm font-semibold" style={{ color: '#1F271B' }}>Total Paid:</span>
-              <span className="text-sm font-bold" style={{ color: '#1F271B' }}>Rs{totalPayments.toFixed(2)}</span>
+              <span className="text-sm font-bold" style={{ color: '#1F271B' }}>{formatUsd(totalPayments)}</span>
             </div>
             {isInvoicePaid && (
               <div className="mt-2 p-2 rounded text-xs text-center" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>Invoice fully paid</div>

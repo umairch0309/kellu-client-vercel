@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { FiX, FiFileText } from 'react-icons/fi'
 import { mockClients, mockWorkorders } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 
 export type SendEmailModalType = 'quote' | 'invoice' | 'job-follow' | 'work-order-report'
 
@@ -25,7 +26,7 @@ interface SendEmailModalProps {
   isOpen: boolean
   onClose: () => void
   type: SendEmailModalType
-  workorderId: number
+  workorderId: number | string
   workorderAttachments: File[]
   onAddWorkorderAttachment: (file: File) => void
   /** When bulk (workorderIds), called with the list of selected workorder IDs to send. Otherwise called with no args. */
@@ -34,9 +35,14 @@ interface SendEmailModalProps {
   defaultSendWhatsApp?: boolean
   /** When provided and length > 1, bulk quote send: To = all clients' emails; right panel = one Quote PDF per work order (each sent only to that client). */
   workorderIds?: number[]
+  /** When provided (e.g. from detail page API fetch), use these instead of mock lookup so modal works with API workorders. */
+  workorder?: any
+  client?: { id: number | string; name: string; email?: string; phone?: string } | null
 }
 
 const MAX_ATTACH_MB = 10
+
+type BulkListItem = { workorderId: number; workorder: any; client: any }
 
 export default function SendEmailModal({
   isOpen,
@@ -48,20 +54,21 @@ export default function SendEmailModal({
   onSend,
   defaultSendWhatsApp,
   workorderIds,
+  workorder: workorderProp,
+  client: clientProp,
 }: SendEmailModalProps) {
   const isBulkQuote = type === 'quote' && workorderIds != null && workorderIds.length > 1
-  const bulkList = isBulkQuote && workorderIds
-    ? workorderIds
-        .map(id => {
-          const wo = mockWorkorders.find(w => w.id === id)
-          const cl = wo ? mockClients.find(c => c.id === wo.clientId) : null
-          return wo && cl ? { workorderId: id, workorder: wo, client: cl } : null
-        })
-        .filter((x): x is { workorderId: number; workorder: typeof mockWorkorders[0]; client: typeof mockClients[0] } => x != null)
+  const bulkListRaw = isBulkQuote && workorderIds
+    ? workorderIds.map(id => {
+        const wo = mockWorkorders.find(w => String(w.id) === String(id))
+        const cl = wo ? mockClients.find(c => String(c.id) === String(wo.clientId)) : null
+        return wo && cl ? { workorderId: id, workorder: wo, client: cl } : null
+      })
     : []
+  const bulkList: BulkListItem[] = bulkListRaw.filter((x): x is BulkListItem => x != null)
 
-  const workorder = mockWorkorders.find(wo => wo.id === workorderId)
-  const client = workorder ? mockClients.find(c => c.id === workorder.clientId) : null
+  const workorder = workorderProp ?? mockWorkorders.find(wo => String(wo.id) === String(workorderId))
+  const client = clientProp ?? (workorder ? mockClients.find(c => String(c.id) === String(workorder.clientId)) ?? null : null)
 
   const [toEmail, setToEmail] = useState('')
   const [subject, setSubject] = useState('')
@@ -92,8 +99,8 @@ export default function SendEmailModal({
     const balance = totalAmount - paymentsTotal
     const hasPayments = paymentsTotal > 0
     const totalPaymentsBalanceBlock = hasPayments
-      ? `\nTotal: Rs${totalAmount.toFixed(2)}\nPayments: Rs${paymentsTotal.toFixed(2)}\nBalance: Rs${balance.toFixed(2)}\n`
-      : `\nTotal: Rs${totalAmount.toFixed(2)}\n`
+      ? `\nTotal: ${formatUsd(totalAmount)}\nPayments: ${formatUsd(paymentsTotal)}\nBalance: ${formatUsd(balance)}\n`
+      : `\nTotal: ${formatUsd(totalAmount)}\n`
     if (type === 'quote') {
       setSubject(`Quote from KELLU - ${workorder.title || 'Job'} ${workorder.quoteNumber || `#${workorder.id}`}`)
       setMessage(`Hi ${client.name},

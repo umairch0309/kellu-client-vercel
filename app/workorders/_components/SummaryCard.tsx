@@ -1,6 +1,7 @@
 'use client'
 
 import { companyTaxRatePercent } from '@/data/mockData'
+import { formatUsd } from '@/lib/formatCurrency'
 
 export interface SummaryCardProps {
   workorder: any
@@ -24,44 +25,44 @@ export default function SummaryCard({ workorder, editedLineItems, totalLabor, to
       <div className="space-y-2 text-sm">
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Subtotal</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{subtotal.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(subtotal)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Discount{workorder.discount > 0 ? (workorder.discountType === 'percentage' ? ` (${workorder.discount}%)` : ' (Amount)') : ''}</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>{workorder.discount > 0 ? `-Rs${workorder.discountType === 'percentage' ? (subtotal * workorder.discount / 100).toFixed(2) : workorder.discount.toFixed(2)}` : '—'}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{workorder.discount > 0 ? formatUsd(-disc) : '—'}</span>
         </div>
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Tax ({companyTaxRatePercent}%)</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{tax.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(tax)}</span>
         </div>
         <div className="flex justify-between items-center font-semibold">
           <span style={{ color: '#1F271B' }}>Total</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{workorder.total.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(workorder.total)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Cost</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{cost.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(cost)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Expenses</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{totalExpenses.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(totalExpenses)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span style={{ color: '#1F271B', opacity: 0.8 }}>Estimated Margin</span>
-          <span className="tabular-nums" style={{ color: margin < 0 ? '#DC2626' : '#059669' }}>Rs{margin.toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: margin < 0 ? '#DC2626' : '#059669' }}>{formatUsd(margin)}</span>
         </div>
         <div className="my-4" style={{ borderTop: '2px dashed rgba(31, 39, 27, 0.4)' }} />
         {totalPayments > 0 && (
           <div className="pl-4 space-y-2">
             <div className="flex justify-between items-center">
               <span style={{ color: '#1F271B', opacity: 0.8 }}>Payments</span>
-              <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{totalPayments.toFixed(2)}</span>
+              <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(totalPayments)}</span>
             </div>
           </div>
         )}
         <div className="flex justify-between items-center font-bold pt-2">
           <span style={{ color: '#1F271B' }}>Balance</span>
-          <span className="tabular-nums" style={{ color: '#1F271B' }}>Rs{(workorder.total - totalPayments).toFixed(2)}</span>
+          <span className="tabular-nums" style={{ color: '#1F271B' }}>{formatUsd(workorder.total - totalPayments)}</span>
         </div>
       </div>
     </div>

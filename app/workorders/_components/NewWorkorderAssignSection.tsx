@@ -38,7 +38,7 @@ export default function NewWorkorderAssignSection({
 }: NewWorkorderAssignSectionProps) {
   return (
     <div className="lg:col-span-1 bg-white rounded-lg shadow-md border p-4" style={{ borderColor: '#EAEBED' }}>
-      <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Assign Team Member</label>
+      <label className="block text-xs font-medium mb-1.5" style={{ color: '#1F271B' }}>Assign Team Member <span style={{ opacity: 0.6, fontWeight: 400 }}>(Optional)</span></label>
       <div className="relative" ref={teamMemberDropdownRef}>
         <button
           type="button"

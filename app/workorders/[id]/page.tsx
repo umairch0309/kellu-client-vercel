@@ -10,7 +10,7 @@ export default function WorkorderDetailPage({ params }: { params: Promise<{ id: 
   return (
     <ProtectedRoute>
       <Layout>
-        <WorkorderDetailView workorderId={parseInt(id)} />
+        <WorkorderDetailView workorderId={id} />
       </Layout>
     </ProtectedRoute>
   )

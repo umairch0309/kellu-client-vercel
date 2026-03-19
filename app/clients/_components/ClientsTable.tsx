@@ -1,17 +1,18 @@
 'use client'
 
-import { FiChevronUp, FiChevronDown, FiMoreVertical, FiArchive } from 'react-icons/fi'
+import { FiChevronUp, FiChevronDown, FiMoreVertical, FiArchive, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import type { ClientListItem } from './clientsListTypes'
-import type { NameSortOption } from './clientsListTypes'
-import type { LastActivitySortOption } from './clientsListTypes'
+import type { NameSortOption, LastActivitySortOption } from './clientsListTypes'
+import { getStatusBadgeStyle } from './clientsListTypes'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface ClientsTableProps {
   clients: ClientListItem[]
-  selectedClientIds: Set<number>
+  selectedClientIds: Set<number | string>
   allFilteredSelected: boolean
   selectAllCheckboxRef: React.RefObject<HTMLInputElement>
   onToggleSelectAll: () => void
-  onToggleClientSelection: (e: React.MouseEvent, clientId: number) => void
+  onToggleClientSelection: (e: React.MouseEvent, clientId: number | string) => void
   getDisplayStatus: (client: ClientListItem) => string
   nameSort: NameSortOption
   setNameSort: (v: NameSortOption) => void
@@ -25,12 +26,14 @@ export interface ClientsTableProps {
   isLastActivitySortOpen: boolean
   setIsLastActivitySortOpen: (v: boolean) => void
   lastActivitySortRef: React.RefObject<HTMLDivElement>
-  hoveredRowId: number | null
-  setHoveredRowId: (v: number | null) => void
-  onRowClick: (clientId: number) => void
-  openRowActionsId: number | null
-  setOpenRowActionsId: (v: number | null) => void
-  onAddWorkorder: (clientId: number) => void
+  hoveredRowId: number | string | null
+  setHoveredRowId: (v: number | string | null) => void
+  onRowClick: (clientId: number | string) => void
+  openRowActionsId: number | string | null
+  setOpenRowActionsId: (v: number | string | null) => void
+  onAddWorkorder: (clientId: number | string) => void
+  onUpdateClient?: (client: ClientListItem) => void
+  onDeleteClient?: (client: ClientListItem) => void
 }
 
 export default function ClientsTable({
@@ -59,8 +62,10 @@ export default function ClientsTable({
   openRowActionsId,
   setOpenRowActionsId,
   onAddWorkorder,
+  onUpdateClient,
+  onDeleteClient,
 }: ClientsTableProps) {
-  const clickableCellProps = (clientId: number) => ({
+  const clickableCellProps = (clientId: number | string) => ({
     onClick: () => onRowClick(clientId),
     onMouseEnter: () => setHoveredRowId(clientId),
     onMouseLeave: () => setHoveredRowId(null),
@@ -70,6 +75,7 @@ export default function ClientsTable({
 
   return (
     <div className="hidden md:block overflow-x-auto">
+      <TooltipProvider delayDuration={200}>
       <table className="w-full">
         <thead>
           <tr style={{ backgroundColor: '#F3F4F6' }}>
@@ -130,7 +136,8 @@ export default function ClientsTable({
                 )}
               </div>
             </th>
-            <th className="px-2 py-2.5 w-10 border-b" style={{ borderColor: '#EAEBED' }} aria-label="Actions" />
+            <th className="px-3 py-2.5 text-left text-xs font-semibold border-b" style={{ color: '#1F271B', borderColor: '#EAEBED' }}>Actions</th>
+            <th className="px-2 py-2.5 w-10 border-b" style={{ borderColor: '#EAEBED' }} aria-label="More" />
           </tr>
         </thead>
         <tbody>
@@ -156,16 +163,43 @@ export default function ClientsTable({
                   <p className="font-medium text-xs" style={{ color: '#1F271B' }}>{client.name}</p>
                 </td>
                 <td {...clickableCellProps(client.id)}>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shadow-sm" style={{
-                    backgroundColor: getDisplayStatus(client) === 'Active' ? 'rgba(40, 175, 176, 0.2)' : getDisplayStatus(client) === 'Follow Up' ? 'rgba(176, 132, 204, 0.2)' : '#F3F4F6',
-                    color: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B',
-                  }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getDisplayStatus(client) === 'Active' ? '#1E8A8B' : getDisplayStatus(client) === 'Follow Up' ? '#8B6AA3' : '#1F271B' }} />
-                    {getDisplayStatus(client)}
-                  </span>
+                  {(() => {
+                    const status = getDisplayStatus(client)
+                    const style = getStatusBadgeStyle(status)
+                    return (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shadow-sm" style={{ backgroundColor: style.backgroundColor, color: style.color }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: style.dotColor }} />
+                        {status}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td {...clickableCellProps(client.id)}>
                   <span className="text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>{client.lastActivity}</span>
+                </td>
+                <td className="px-2 py-2.5 border-b align-middle" style={{ borderColor: '#EAEBED', backgroundColor: isRowHovered ? '#F9FAFB' : 'white' }} onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1">
+                    {onUpdateClient && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" onClick={() => onUpdateClient(client)} className="p-1.5 rounded transition-colors hover:opacity-90" style={{ color: '#28AFB0' }} aria-label="Edit client">
+                            <FiEdit2 size={16} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="z-[100]">Edit client</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {onDeleteClient && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" onClick={() => onDeleteClient(client)} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#B91C1C' }} aria-label="Delete client">
+                            <FiTrash2 size={16} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="z-[100]">Delete client</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </td>
                 <td className="px-2 py-2.5 w-10 border-b align-middle" style={{ borderColor: '#EAEBED', backgroundColor: isRowHovered ? '#F9FAFB' : 'white' }} data-row-actions data-client-id={client.id}>
                   <div className="relative flex justify-center">
@@ -191,6 +225,7 @@ export default function ClientsTable({
           })}
         </tbody>
       </table>
+      </TooltipProvider>
     </div>
   )
 }

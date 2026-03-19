@@ -155,7 +155,9 @@ export default function JobDetailsCard({
             <div>
               <p className="text-xs font-medium mb-1" style={{ color: '#1F271B', opacity: 0.7 }}>Schedule:</p>
               <p className="text-sm" style={{ color: '#1F271B' }}>
-                {format(new Date(workorder.schedule.day), 'MMM dd, yyyy')} • {workorder.schedule.startTime} - {workorder.schedule.endTime}
+                {workorder.schedule
+                  ? `${format(new Date(workorder.schedule.day), 'MMM dd, yyyy')} • ${workorder.schedule.startTime ?? '—'} - ${workorder.schedule.endTime ?? '—'}`
+                  : '—'}
               </p>
             </div>
             <div>
