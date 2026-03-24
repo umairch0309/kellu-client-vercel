@@ -103,6 +103,7 @@ function expenseRawToDisplay(raw: Record<string, unknown>): { date: string; item
   }
 }
 
+
 function normalizeDetailWorkorder(raw: Record<string, unknown>, workorderId: number | string): DetailWorkorderShape {
   const id = raw.id ?? workorderId
   const client = (raw.client ?? {}) as Record<string, unknown>

@@ -14,7 +14,7 @@ export interface ExpenseListRow {
   /** e.g. WO #123 or work order number from API */
   workOrderLabel: string
   clientName: string | null
-}
+}       
 
 export type ExpensesPagination = {
   page: number

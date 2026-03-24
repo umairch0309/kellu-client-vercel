@@ -16,7 +16,7 @@ export interface AddExpenseModalProps {
   onSave: (payload: { date: string; itemName: string; details: string; total: number; amount: number; linkedWorkorder: number | string | null; invoiceNumber: string }) => void
   onDelete: () => void
   resetForm: () => void
-  /** When set and adding (not editing), saving will POST to /api/workorders/{workorderId}/expenses. On success, called with the created expense to append to the list. */
+  /** When set & adding (not editing), saving will POST to /api/workorders/{workorderId}/expenses. On success, called with the created expense to append to the list. */
   onExpenseCreated?: (expense: ExpenseDisplay) => void
 }
 

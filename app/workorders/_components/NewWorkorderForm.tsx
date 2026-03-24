@@ -262,7 +262,6 @@ export default function NewWorkorderForm({ workorderId }: NewWorkorderFormProps 
   }, [fetchPriceList])
 
   const workorder = workorderId ? mockWorkorders.find(wo => String(wo.id) === String(workorderId)) : null
-
   const [formData, setFormData] = useState({
     title: workorder?.title || '',
     clientId: (workorder?.clientId ?? null) as number | string | null,

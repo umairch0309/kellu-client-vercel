@@ -44,7 +44,6 @@ export default function BookingConfirmationModal({
   const [sendError, setSendError] = useState<string | null>(null)
 
   if (!isOpen || !workorder || !client) return null
-
   const handleSend = async () => {
     setSendError(null)
     setSending(true)
