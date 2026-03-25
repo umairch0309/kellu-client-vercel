@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FiBell, FiSearch, FiSettings, FiLogOut, FiDollarSign, FiPackage, FiFileText, FiUser } from 'react-icons/fi'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-
-const USER = { name: 'Test User', email: 'matcareapp@gmail.com' }
+import { authClient } from '@/lib/auth-client'
 
 const MOCK_ACTIVITIES = [
   { id: 1, type: 'invoice', text: 'test u created an invoice - $889.00', detail: 'Invoice #1 - Testing', client: 'client test', ago: '19 hours ago', icon: FiDollarSign, iconBg: '#2B50AA' },
@@ -18,6 +17,7 @@ const MOCK_ACTIVITIES = [
 
 export default function Header() {
   const router = useRouter()
+  const { data: session } = authClient.useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -38,7 +38,9 @@ export default function Header() {
     router.push('/login')
   }
 
-  const initials = USER.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+  const userName = (session?.user as { name?: string | null } | undefined)?.name?.trim() || 'User'
+  const userEmail = (session?.user as { email?: string | null } | undefined)?.email?.trim() || ''
+  const initials = userName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
   return (
     <header className="bg-white border-b shadow-sm" style={{ borderColor: '#EAEBED' }}>
@@ -105,8 +107,8 @@ export default function Header() {
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold truncate" style={{ color: '#1F271B' }}>{USER.name}</p>
-                    <p className="text-sm truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{USER.email}</p>
+                    <p className="font-semibold truncate" style={{ color: '#1F271B' }}>{userName}</p>
+                    <p className="text-sm truncate" style={{ color: '#1F271B', opacity: 0.7 }}>{userEmail || '—'}</p>
                   </div>
                 </div>
 
@@ -121,19 +123,10 @@ export default function Header() {
                     Settings
                   </Link>
                   <div className="mx-3 my-1 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
-                  <Link
-                    href="/settings"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-black/5 transition-colors"
-                    style={{ color: '#1F271B' }}
-                  >
-                    Manage Team
-                  </Link>
-                  <div className="mx-3 my-1 border-t" style={{ borderStyle: 'dashed', borderColor: '#EAEBED' }} />
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-black/5 transition-colors"
-                    style={{ color: '#1F271B' }}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-red-50"
+                    style={{ color: '#B91C1C' }}
                   >
                     <FiLogOut size={16} />
                     Log out

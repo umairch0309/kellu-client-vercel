@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   FiClipboard, 
@@ -12,55 +12,130 @@ import { format } from 'date-fns'
 import { mockWorkorders } from '@/data/mockData'
 import AddWorkorderModal from '@/app/clients/_components/AddWorkorderModal'
 import { Button } from '../ui/button'
+import { authClient } from '@/lib/auth-client'
+import { parseInvoiceOverviewResponse } from '@/app/invoices/_lib/invoiceOverviewApi'
 
 export default function BusinessDashboard() {
   const router = useRouter()
+  const { data: session } = authClient.useSession()
   const [isAddWorkorderOpen, setIsAddWorkorderOpen] = useState(false)
   const [selectedViewTab, setSelectedViewTab] = useState<'Schedule' | 'Employee'>('Schedule')
+  const [quoteStats, setQuoteStats] = useState<Record<string, number>>({
+    'not sent': 0,
+    'waiting for approval': 0,
+    approved: 0,
+  })
+  const [jobStats, setJobStats] = useState<Record<string, number>>({
+    Unscheduled: 0,
+    Scheduled: 0,
+    'In Progress': 0,
+    Completed: 0,
+    Cancelled: 0,
+  })
+  const [invoiceStats, setInvoiceStats] = useState<Record<string, number>>({
+    'not sent': 0,
+    'waiting for payment': 0,
+    paid: 0,
+    overdue: 0,
+    'bad debt': 0,
+    cancelled: 0,
+  })
   
   // Get current date and time for greeting
   const currentDate = new Date()
   const formattedDate = format(currentDate, 'EEEE, MMMM d')
   
-  // Get user name (in a real app, this would come from auth context)
-  const userName = 'Umair'
+  const userName = (session?.user as { name?: string | null } | undefined)?.name?.trim() || 'User'
   const greeting = 'Good morning'
 
-  // Calculate real-time stats from mockWorkorders
-  const quoteStats = useMemo(() => ({
-    'not sent': mockWorkorders.filter(w => w.quoteStatus === 'not sent').length,
-    'waiting for approval': mockWorkorders.filter(w => w.quoteStatus === 'waiting for approval').length,
-    'approved': mockWorkorders.filter(w => w.quoteStatus === 'approved').length,
-  }), [])
+  useEffect(() => {
+    let cancelled = false
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+    const QUOTE_MAP: Record<string, string> = {
+      NOT_SENT: 'not sent',
+      AWAITING_RESPONSE: 'waiting for approval',
+      APPROVED: 'approved',
+      CONVERTED: 'approved',
+      REJECTED: 'rejected',
+      EXPIRED: 'expired',
+    }
+    const JOB_MAP: Record<string, string> = {
+      UNSCHEDULED: 'Unscheduled',
+      UNASSIGNED: 'Unscheduled',
+      SCHEDULED: 'Scheduled',
+      ON_MY_WAY: 'In Progress',
+      IN_PROGRESS: 'In Progress',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+    }
+    const INVOICE_MAP: Record<string, string> = {
+      NOT_SENT: 'not sent',
+      AWAITING_PAYMENT: 'waiting for payment',
+      OVERDUE: 'overdue',
+      PAID: 'paid',
+      BAD_DEBT: 'bad debt',
+      CANCELLED: 'cancelled',
+    }
 
-  const jobStats = useMemo(() => ({
-    'Unscheduled': mockWorkorders.filter(w => w.jobStatus === 'Unscheduled').length,
-    'Scheduled': mockWorkorders.filter(w => w.jobStatus === 'Scheduled').length,
-    'In Progress': mockWorkorders.filter(w => w.jobStatus === 'In Progress').length,
-    'Completed': mockWorkorders.filter(w => w.jobStatus === 'Completed').length,
-  }), [])
+    const fetchDashboardStats = async () => {
+      try {
+        const [quotesRes, workordersRes, invoicesRes] = await Promise.all([
+          fetch(`${baseUrl}/api/quotes/overview`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }),
+          fetch(`${baseUrl}/api/workorders/overview`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }),
+          fetch(`${baseUrl}/api/invoices/overview`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }),
+        ])
 
-  const invoiceStats = useMemo(() => ({
-    'not sent': mockWorkorders.filter(w => w.invoiceStatus === 'not sent').length,
-    'waiting for payment': mockWorkorders.filter(w => w.invoiceStatus === 'waiting for payment').length,
-    'paid': mockWorkorders.filter(w => w.invoiceStatus === 'paid').length,
-  }), [])
+        const quotesJson = await quotesRes.json().catch(() => ({}))
+        if (!cancelled && quotesRes.ok && (quotesJson as { success?: boolean }).success !== false) {
+          const rows = Array.isArray((quotesJson as { data?: unknown }).data) ? ((quotesJson as { data?: unknown[] }).data ?? []) : []
+          const nextQuote = { 'not sent': 0, 'waiting for approval': 0, approved: 0 }
+          rows
+            .filter((row): row is Record<string, unknown> => row != null && typeof row === 'object')
+            .forEach((row) => {
+              const mapped = QUOTE_MAP[String(row.status)] ?? String(row.status).replace(/_/g, ' ').toLowerCase()
+              const n = Number(row.count) || 0
+              if (mapped === 'not sent' || mapped === 'waiting for approval' || mapped === 'approved') {
+                nextQuote[mapped] = (nextQuote[mapped] ?? 0) + n
+              }
+            })
+          setQuoteStats(nextQuote)
+        }
 
-  // Calculate "Requires invoicing" - jobs that are completed but not invoiced
-  const requiresInvoicing = useMemo(() => {
-    return mockWorkorders.filter(w => 
-      w.jobStatus === 'Completed' && 
-      (w.invoiceStatus === 'not sent' || !w.invoiceNumber)
-    ).length
+        const workordersJson = await workordersRes.json().catch(() => ({}))
+        if (!cancelled && workordersRes.ok) {
+          const data = ((workordersJson as Record<string, unknown>).data ?? {}) as Record<string, unknown>
+          const jobRaw = (data.jobStatus ?? []) as Array<{ status: string; count: number }>
+          const nextJob = { Unscheduled: 0, Scheduled: 0, 'In Progress': 0, Completed: 0, Cancelled: 0 }
+          jobRaw.forEach(({ status, count }) => {
+            const key = JOB_MAP[status] ?? status.replace(/_/g, ' ').trim()
+            if (key in nextJob) nextJob[key as keyof typeof nextJob] = (nextJob[key as keyof typeof nextJob] ?? 0) + (Number(count) || 0)
+          })
+          setJobStats(nextJob)
+        }
+
+        const invoicesJson = await invoicesRes.json().catch(() => ({}))
+        const parsedInvoiceOverview = parseInvoiceOverviewResponse(invoicesJson)
+        if (!cancelled && invoicesRes.ok && parsedInvoiceOverview) {
+          const nextInvoice = { 'not sent': 0, 'waiting for payment': 0, paid: 0, overdue: 0, 'bad debt': 0, cancelled: 0 }
+          parsedInvoiceOverview.byStatus.forEach((row) => {
+            const key = INVOICE_MAP[row.status] ?? row.status.replace(/_/g, ' ').toLowerCase()
+            if (key in nextInvoice) nextInvoice[key as keyof typeof nextInvoice] = (nextInvoice[key as keyof typeof nextInvoice] ?? 0) + (Number(row.count) || 0)
+          })
+          setInvoiceStats(nextInvoice)
+        }
+      } catch {
+        // Keep existing values if a request fails.
+      }
+    }
+
+    void fetchDashboardStats()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // Calculate "Action required" - jobs that need attention (overdue, etc.)
-  const actionRequired = useMemo(() => {
-    return mockWorkorders.filter(w => 
-      w.jobStatus === 'Overdue' || 
-      (w.jobStatus === 'Scheduled' && w.schedule && new Date(w.schedule.day) < new Date())
-    ).length
-  }, [])
+  const requiresInvoicing = invoiceStats['not sent'] ?? 0
+  const actionRequired = (invoiceStats.overdue ?? 0) + (invoiceStats['bad debt'] ?? 0)
 
   const workflowCards = useMemo(() => [
     {

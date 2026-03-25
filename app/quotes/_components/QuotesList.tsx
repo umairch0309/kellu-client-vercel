@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { subDays } from 'date-fns'
-import { mockWorkorders } from '@/data/mockData'
+import { usePDFDownload } from '@/hooks/pdf-download'
 import SendEmailModal from '../../workorders/_components/SendEmailModal'
 import AddWorkorderModal from '../../clients/_components/AddWorkorderModal'
 import type { QuoteRow } from './quotesListTypes'
@@ -13,53 +13,59 @@ import QuotesFiltersBar from './QuotesFiltersBar'
 import QuotesSelectionBar from './QuotesSelectionBar'
 import QuotesTable from './QuotesTable'
 
-function buildQuoteRows(): QuoteRow[] {
-  const rows: QuoteRow[] = []
-  mockWorkorders.forEach((wo: { id: number; quoteStatus?: string; quoteRequired?: boolean; quoteNumber?: string; clientName: string; title: string; total?: number; quoteDateSent?: string; quoteWhatsappStatus?: string }) => {
-    const quoteRequired = (wo as { quoteRequired?: boolean }).quoteRequired === true
-    const notSent = wo.quoteStatus === 'not sent'
+function extractQuotesList(json: unknown): unknown[] {
+  if (json == null || typeof json !== 'object') return []
+  const obj = json as Record<string, unknown>
+  const data = obj.data
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const nested = (data as Record<string, unknown>).data
+    if (Array.isArray(nested)) return nested
+  }
+  if (Array.isArray(data)) return data
+  return []
+}
 
-    if (notSent) {
-      if (quoteRequired) {
-        rows.push({
-          id: wo.id,
-          quoteNumber: '—',
-          clientName: wo.clientName,
-          title: wo.title,
-          total: wo.total ?? 0,
-          dateSent: null,
-          status: 'quote pending to send',
-          workorderId: wo.id,
-        })
-      } else {
-        rows.push({
-          id: wo.id,
-          quoteNumber: '—',
-          clientName: wo.clientName,
-          title: wo.title,
-          total: wo.total ?? 0,
-          dateSent: null,
-          status: 'draft',
-          workorderId: wo.id,
-        })
-      }
-      return
-    }
-    if (wo.quoteNumber) {
-      rows.push({
-        id: wo.id,
-        quoteNumber: wo.quoteNumber,
-        clientName: wo.clientName,
-        title: wo.title,
-        total: wo.total ?? 0,
-        dateSent: wo.quoteDateSent || null,
-        status: (wo.quoteStatus as QuoteRow['status']) || 'waiting for approval',
-        whatsappStatus: wo.quoteWhatsappStatus,
-        workorderId: wo.id,
-      })
-    }
-  })
-  return rows
+function mapQuoteStatus(status: string): QuoteRow['status'] {
+  const map: Record<string, QuoteRow['status']> = {
+    NOT_SENT: 'quote pending to send',
+    AWAITING_RESPONSE: 'waiting for approval',
+    APPROVED: 'approved',
+    CONVERTED: 'approved',
+    REJECTED: 'rejected',
+    EXPIRED: 'expired',
+  }
+  return map[status] ?? 'draft'
+}
+
+function normalizeQuoteFromApi(raw: Record<string, unknown>): QuoteRow {
+  const id = raw.id != null ? String(raw.id) : ''
+  const workOrderNumber =
+    raw.workOrderNumber != null && String(raw.workOrderNumber).trim() !== ''
+      ? String(raw.workOrderNumber)
+      : '—'
+  const client = (raw.client ?? {}) as Record<string, unknown>
+  const clientName = typeof client.name === 'string' ? client.name : '—'
+  const total =
+    typeof raw.total === 'number' ? raw.total : typeof raw.total === 'string' ? parseFloat(raw.total) || 0 : 0
+  const statusRaw = typeof raw.quoteStatus === 'string' ? raw.quoteStatus : ''
+  const dateSent = raw.quoteSentAt != null ? String(raw.quoteSentAt) : null
+  return {
+    id,
+    quoteNumber: workOrderNumber,
+    clientName,
+    title: typeof raw.title === 'string' ? raw.title : '—',
+    total,
+    dateSent,
+    status: mapQuoteStatus(statusRaw),
+    workorderId: id,
+  }
+}
+
+type QuoteOverviewApiStatus = 'NOT_SENT' | 'AWAITING_RESPONSE' | 'APPROVED' | 'CONVERTED' | 'REJECTED' | 'EXPIRED'
+
+type QuoteOverviewApiRow = {
+  status: QuoteOverviewApiStatus
+  count: number
 }
 
 const STATUS_FILTER_OPTIONS = [
@@ -74,16 +80,85 @@ const STATUS_FILTER_OPTIONS = [
 
 export default function QuotesList() {
   const router = useRouter()
+  const { downloadPDF } = usePDFDownload({ title: 'Quote', filename: 'quote' })
   const [isNewQuoteModalOpen, setIsNewQuoteModalOpen] = useState(false)
-  const allQuoteRows = useMemo(() => buildQuoteRows(), [isNewQuoteModalOpen])
+  const [allQuoteRows, setAllQuoteRows] = useState<QuoteRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [overviewRows, setOverviewRows] = useState<QuoteOverviewApiRow[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
-  const [sendQuoteWorkorderId, setSendQuoteWorkorderId] = useState<number | null>(null)
-  const [sendQuoteBulkWorkorderIds, setSendQuoteBulkWorkorderIds] = useState<number[] | null>(null)
-  const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<number>>(new Set())
+  const [sendingQuoteIds, setSendingQuoteIds] = useState<Set<string>>(new Set())
+  const [sendQuoteBulkWorkorderIds, setSendQuoteBulkWorkorderIds] = useState<string[] | null>(null)
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string>>(new Set())
   const statusDropdownRef = useRef<HTMLDivElement>(null)
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null)
+
+  const fetchQuotes = async () => {
+    setLoading(true)
+    setFetchError(null)
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const res = await fetch(`${baseUrl}/api/quotes`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg = (json as { message?: string }).message ?? `Failed to load quotes (${res.status})`
+        throw new Error(msg)
+      }
+      const rows = extractQuotesList(json)
+        .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object')
+        .map((item) => normalizeQuoteFromApi(item))
+      setAllQuoteRows(rows)
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to load quotes')
+      setAllQuoteRows([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchQuotes()
+  }, [isNewQuoteModalOpen])
+
+  const fetchOverview = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const res = await fetch(`${baseUrl}/api/quotes/overview`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        setOverviewRows([])
+        return
+      }
+      const data = (json as { data?: unknown }).data
+      if (!Array.isArray(data)) {
+        setOverviewRows([])
+        return
+      }
+      const rows = data
+        .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object')
+        .map((item) => ({
+          status: String(item.status) as QuoteOverviewApiStatus,
+          count: Number(item.count) || 0,
+        }))
+      setOverviewRows(rows)
+    } catch {
+      setOverviewRows([])
+    }
+  }
+
+  useEffect(() => {
+    void fetchOverview()
+  }, [isNewQuoteModalOpen])
 
   const filteredQuotes = useMemo(() => {
     return allQuoteRows.filter(quote => {
@@ -111,7 +186,7 @@ export default function QuotesList() {
       })
     }
   }
-  const toggleQuoteSelection = (e: React.MouseEvent, quoteId: number) => {
+  const toggleQuoteSelection = (e: React.MouseEvent, quoteId: string) => {
     e.stopPropagation()
     setSelectedQuoteIds(prev => {
       const next = new Set(prev)
@@ -125,13 +200,35 @@ export default function QuotesList() {
   const now = new Date()
   const thirtyDaysAgo = subDays(now, 30)
 
-  const overviewCounts = useMemo(() => ({
-    draft: allQuoteRows.filter(q => q.status === 'draft').length,
-    'awaiting response': allQuoteRows.filter(q => q.status === 'waiting for approval').length,
-    'changes requested': allQuoteRows.filter(q => q.status === 'rejected').length,
-    approved: allQuoteRows.filter(q => q.status === 'approved').length,
-    'quote pending to send': allQuoteRows.filter(q => q.status === 'quote pending to send').length,
-  }), [allQuoteRows])
+  const overviewCounts = useMemo(() => {
+    const byStatus: Record<string, number> = {}
+    overviewRows.forEach((row) => {
+      byStatus[row.status] = (byStatus[row.status] ?? 0) + row.count
+    })
+    const hasOverviewApi = overviewRows.length > 0
+    if (hasOverviewApi) {
+      return {
+        draft: 0,
+        'awaiting response': byStatus.AWAITING_RESPONSE ?? 0,
+        'changes requested': byStatus.REJECTED ?? 0,
+        approved: (byStatus.APPROVED ?? 0) + (byStatus.CONVERTED ?? 0),
+        'quote pending to send': byStatus.NOT_SENT ?? 0,
+        sentCount: (byStatus.AWAITING_RESPONSE ?? 0) + (byStatus.APPROVED ?? 0) + (byStatus.CONVERTED ?? 0) + (byStatus.REJECTED ?? 0) + (byStatus.EXPIRED ?? 0),
+        convertedCount: (byStatus.APPROVED ?? 0) + (byStatus.CONVERTED ?? 0),
+        hasOverviewApi,
+      }
+    }
+    return {
+      draft: allQuoteRows.filter(q => q.status === 'draft').length,
+      'awaiting response': allQuoteRows.filter(q => q.status === 'waiting for approval').length,
+      'changes requested': allQuoteRows.filter(q => q.status === 'rejected').length,
+      approved: allQuoteRows.filter(q => q.status === 'approved').length,
+      'quote pending to send': allQuoteRows.filter(q => q.status === 'quote pending to send').length,
+      sentCount: allQuoteRows.filter(q => q.status !== 'quote pending to send' && q.status !== 'draft').length,
+      convertedCount: allQuoteRows.filter(q => q.status === 'approved').length,
+      hasOverviewApi,
+    }
+  }, [overviewRows, allQuoteRows])
 
   const sentPast30 = useMemo(() => {
     return allQuoteRows.filter(q => q.dateSent && new Date(q.dateSent) >= thirtyDaysAgo && q.status !== 'quote pending to send' && q.status !== 'draft')
@@ -141,7 +238,12 @@ export default function QuotesList() {
     return allQuoteRows.filter(q => q.status === 'approved' && q.dateSent && new Date(q.dateSent) >= thirtyDaysAgo)
   }, [allQuoteRows])
 
-  const conversionRate = sentPast30.length > 0 ? Math.round((convertedPast30.length / sentPast30.length) * 100) : 0
+  const conversionRate =
+    overviewCounts.sentCount > 0
+      ? Math.round((overviewCounts.convertedCount / overviewCounts.sentCount) * 100)
+      : sentPast30.length > 0
+        ? Math.round((convertedPast30.length / sentPast30.length) * 100)
+        : 0
   const sentTotalValue = sentPast30.reduce((sum, q) => sum + q.total, 0)
   const convertedTotalValue = convertedPast30.reduce((sum, q) => sum + q.total, 0)
 
@@ -183,8 +285,63 @@ export default function QuotesList() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isStatusDropdownOpen])
 
-  const handleRowClick = (workorderId: number) => {
+  const handleRowClick = (workorderId: string) => {
     router.push(`/workorders/${workorderId}`)
+  }
+
+  const handleSendQuote = async (quoteId: string) => {
+    if (!quoteId || sendingQuoteIds.has(quoteId)) return
+    setSendingQuoteIds((prev) => new Set(prev).add(quoteId))
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+      const res = await fetch(`${baseUrl}/api/quotes/${encodeURIComponent(quoteId)}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ observations: null }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to send quote (${res.status})`
+        alert(msg)
+        return
+      }
+      alert((json as { message?: string }).message ?? 'Quote sent successfully.')
+      await Promise.all([fetchQuotes(), fetchOverview()])
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to send quote')
+    } finally {
+      setSendingQuoteIds((prev) => {
+        const next = new Set(prev)
+        next.delete(quoteId)
+        return next
+      })
+    }
+  }
+
+  // Approval actions temporarily disabled (manual approve/reject)
+
+  const handleReviewQuotePdf = (quote: QuoteRow) => {
+    downloadPDF(
+      [
+        {
+          Client: quote.clientName,
+          'Quote #': quote.quoteNumber,
+          Title: quote.title,
+          Status: quote.status,
+          'Date sent': quote.dateSent ?? '—',
+          Total: quote.total,
+        },
+      ],
+      {
+        filename: `quote-${quote.id}`,
+        title: 'Quote',
+        subtitle: quote.quoteNumber !== '—' ? `${quote.quoteNumber} — ${quote.title}` : quote.title,
+      },
+    )
   }
 
   return (
@@ -196,9 +353,9 @@ export default function QuotesList() {
         statusFilter={statusFilter}
         setFilterFromOverview={setFilterFromOverview}
         conversionRate={conversionRate}
-        sentPast30Count={sentPast30.length}
+        sentPast30Count={overviewCounts.sentCount}
         sentTotalValue={sentTotalValue}
-        convertedPast30Count={convertedPast30.length}
+        convertedPast30Count={overviewCounts.convertedCount}
         convertedTotalValue={convertedTotalValue}
       />
 
@@ -219,6 +376,12 @@ export default function QuotesList() {
           />
         </div>
 
+        {fetchError && (
+          <div className="mb-3 rounded border px-3 py-2 text-xs" style={{ borderColor: '#FCA5A5', color: '#B91C1C', backgroundColor: '#FEF2F2' }}>
+            {fetchError}
+          </div>
+        )}
+
         {selectedQuoteIds.size > 0 && (
           <QuotesSelectionBar
             selectedCount={selectedQuoteIds.size}
@@ -237,24 +400,17 @@ export default function QuotesList() {
           onToggleSelectAll={toggleSelectAll}
           onToggleQuoteSelection={toggleQuoteSelection}
           onRowClick={handleRowClick}
-          onSendQuote={setSendQuoteWorkorderId}
+          onSendQuote={handleSendQuote}
+          onReviewQuote={handleReviewQuotePdf}
+          sendingQuoteIds={sendingQuoteIds}
         />
-      </div>
 
-      {sendQuoteWorkorderId !== null && sendQuoteBulkWorkorderIds === null && (
-        <SendEmailModal
-          isOpen={true}
-          onClose={() => setSendQuoteWorkorderId(null)}
-          type="quote"
-          workorderId={sendQuoteWorkorderId}
-          workorderAttachments={[]}
-          onAddWorkorderAttachment={() => {}}
-          onSend={() => {
-            setSendQuoteWorkorderId(null)
-            alert('Quote sent successfully!')
-          }}
-        />
-      )}
+        {loading && (
+          <p className="text-xs mt-2" style={{ color: '#1F271B', opacity: 0.6 }}>
+            Loading quotes...
+          </p>
+        )}
+      </div>
 
       {isNewQuoteModalOpen && (
         <AddWorkorderModal

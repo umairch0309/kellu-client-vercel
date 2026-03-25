@@ -30,11 +30,11 @@ interface SendEmailModalProps {
   workorderAttachments: File[]
   onAddWorkorderAttachment: (file: File) => void
   /** When bulk (workorderIds), called with the list of selected workorder IDs to send. Otherwise called with no args. */
-  onSend: (selectedWorkorderIds?: number[]) => void
+  onSend: (selectedWorkorderIds?: Array<number | string>) => void
   /** Initial state for "Send via WhatsApp" from settings. If not provided, reads from localStorage. */
   defaultSendWhatsApp?: boolean
   /** When provided and length > 1, bulk quote send: To = all clients' emails; right panel = one Quote PDF per work order (each sent only to that client). */
-  workorderIds?: number[]
+  workorderIds?: Array<number | string>
   /** When provided (e.g. from detail page API fetch), use these instead of mock lookup so modal works with API workorders. */
   workorder?: any
   client?: { id: number | string; name: string; email?: string; phone?: string } | null
@@ -42,7 +42,7 @@ interface SendEmailModalProps {
 
 const MAX_ATTACH_MB = 10
 
-type BulkListItem = { workorderId: number; workorder: any; client: any }
+type BulkListItem = { workorderId: number | string; workorder: any; client: any }
 
 export default function SendEmailModal({
   isOpen,
@@ -78,7 +78,7 @@ export default function SendEmailModal({
   const [selectedExisting, setSelectedExisting] = useState<Set<number>>(new Set())
   const [newWorkorderFiles, setNewWorkorderFiles] = useState<File[]>([])
   const [selectedNew, setSelectedNew] = useState<Set<number>>(new Set())
-  const [selectedBulkWorkorderIds, setSelectedBulkWorkorderIds] = useState<Set<number>>(new Set())
+  const [selectedBulkWorkorderIds, setSelectedBulkWorkorderIds] = useState<Set<number | string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -218,7 +218,7 @@ KELLU`)
     onClose()
   }
 
-  const toggleBulkQuote = (id: number) => {
+  const toggleBulkQuote = (id: number | string) => {
     setSelectedBulkWorkorderIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)

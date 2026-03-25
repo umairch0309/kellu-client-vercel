@@ -7,13 +7,15 @@ import type { QuoteRow } from './quotesListTypes'
 
 export interface QuotesTableProps {
   quotes: QuoteRow[]
-  selectedQuoteIds: Set<number>
+  selectedQuoteIds: Set<string>
   allFilteredSelected: boolean
   selectAllCheckboxRef: React.RefObject<HTMLInputElement>
   onToggleSelectAll: () => void
-  onToggleQuoteSelection: (e: React.MouseEvent, quoteId: number) => void
-  onRowClick: (workorderId: number) => void
-  onSendQuote: (workorderId: number) => void
+  onToggleQuoteSelection: (e: React.MouseEvent, quoteId: string) => void
+  onRowClick: (workorderId: string) => void
+  onSendQuote: (quoteId: string) => void
+  onReviewQuote: (quote: QuoteRow) => void
+  sendingQuoteIds?: Set<string>
 }
 
 function getStatusColor(status: string) {
@@ -46,6 +48,8 @@ export default function QuotesTable({
   onToggleQuoteSelection,
   onRowClick,
   onSendQuote,
+  onReviewQuote,
+  sendingQuoteIds,
 }: QuotesTableProps) {
   if (quotes.length === 0) {
     return (
@@ -77,6 +81,7 @@ export default function QuotesTable({
             <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>QUOTE # / TITLE</th>
             <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>DATE SENT</th>
             <th className="text-left py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>STATUS</th>
+            {/* Approval actions temporarily disabled (manual approve/reject) */}
             <th className="text-right py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>TOTAL</th>
             <th className="text-right py-2 px-2 font-medium text-xs" style={{ color: '#1F271B', opacity: 0.7 }}>ACTIONS</th>
           </tr>
@@ -84,6 +89,7 @@ export default function QuotesTable({
         <tbody>
           {quotes.map((quote) => {
             const statusColors = getStatusColor(quote.status)
+            const sendLoading = sendingQuoteIds?.has(quote.id) ?? false
             return (
               <tr
                 key={quote.id}
@@ -126,19 +132,20 @@ export default function QuotesTable({
                     {(quote.status === 'quote pending to send' || quote.status === 'draft' || quote.dateSent) && (
                       <button
                         type="button"
-                        onClick={() => onSendQuote(quote.workorderId)}
+                        onClick={() => onSendQuote(quote.id)}
+                        disabled={sendLoading}
                         className="p-1.5 rounded transition-all"
                         style={{ color: '#28AFB0', backgroundColor: 'transparent' }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F0FDFA' }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
-                        title={quote.dateSent ? 'Resend Quote' : 'Send Quote'}
+                        title={sendLoading ? 'Sending...' : quote.dateSent ? 'Resend Quote' : 'Send Quote'}
                       >
                         <FiSend size={14} />
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => alert('PDF preview would open here')}
+                      onClick={() => onReviewQuote(quote)}
                       className="p-1.5 rounded transition-all"
                       style={{ color: '#1F271B', backgroundColor: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3F4F6' }}

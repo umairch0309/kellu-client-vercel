@@ -99,9 +99,11 @@ export default function AddWorkorderModalFooter({
       <button
         type="submit"
         disabled={isSubmitting}
-        className="px-2.5 py-1 bg-secondary text-white rounded hover:bg-secondary-dark transition-colors text-xs font-medium disabled:opacity-50 disabled:pointer-events-none"
+        className={`px-2.5 py-1 text-white rounded transition-colors text-xs font-medium disabled:opacity-50 disabled:pointer-events-none ${
+          quoteOnly ? 'bg-[#28AFB0] hover:bg-secondary-dark' : 'bg-secondary hover:bg-secondary-dark'
+        }`}
       >
-        {quoteOnly ? 'Save Quote' : effectiveTaskType === 'task' ? 'Save' : 'Save'}
+        {isSubmitting ? (quoteOnly ? 'Saving quote…' : 'Saving…') : quoteOnly ? 'Save Quote' : effectiveTaskType === 'task' ? 'Save' : 'Save'}
       </button>
     </div>
   )

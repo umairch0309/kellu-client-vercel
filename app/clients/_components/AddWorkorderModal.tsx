@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { format, parse } from 'date-fns'
-import { mockClients, mockTeamMembers, mockMasterPriceList, mockWorkorders } from '@/data/mockData'
+import { mockClients, mockTeamMembers, mockMasterPriceList } from '@/data/mockData'
 import { extractClientsList, normalizeApiClientOption, type ApiClientOption } from '@/lib/clientsListApi'
 import { extractPriceList, normalizePriceListSelectItem, type PriceListSelectItem } from '@/lib/priceListApi'
 import AddClientModal from './AddClientModal'
@@ -70,12 +70,13 @@ export default function AddWorkorderModal({
   const invoiceOnly = mode === 'invoice-only'
   const taskOnly = mode === 'task'
   const documentOnly = quoteOnly || invoiceOnly
+  const apiBackedDocument = quoteOnly || invoiceOnly
 
   const [apiClients, setApiClients] = useState<ApiClientOption[]>([])
   const [clientsLoading, setClientsLoading] = useState(false)
   const [priceListItems, setPriceListItems] = useState<PriceListSelectItem[]>([])
   const [priceListLoading, setPriceListLoading] = useState(false)
-  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false)
+  const [documentSubmitting, setDocumentSubmitting] = useState(false)
 
   const [taskType, setTaskType] = useState<'workorder' | 'task'>(taskOnly ? 'task' : 'workorder')
   const effectiveTaskType = taskOnly ? 'task' : taskType
@@ -150,7 +151,7 @@ export default function AddWorkorderModal({
   const selectAllAssign = () => setFormData(prev => ({ ...prev, assignedTeamMembers: assignOptions.map(o => o.value) }))
 
   const masterPriceSource = useMemo(() => {
-    if (invoiceOnly) {
+    if (apiBackedDocument) {
       return priceListItems.map((item) => ({
         id: item.id,
         name: item.name,
@@ -160,7 +161,7 @@ export default function AddWorkorderModal({
       }))
     }
     return mockMasterPriceList
-  }, [invoiceOnly, priceListItems])
+  }, [apiBackedDocument, priceListItems])
 
   const addLineItemFiltered = masterPriceSource.filter(
     item => item.name.toLowerCase().includes(addLineItemSearchTerm.toLowerCase()) ||
@@ -204,7 +205,7 @@ export default function AddWorkorderModal({
 
   const filteredClientsForModal = useMemo(() => {
     const term = (formData.client || '').toLowerCase()
-    if (invoiceOnly) {
+    if (apiBackedDocument) {
       return apiClients
         .filter(
           (c) =>
@@ -226,10 +227,10 @@ export default function AddWorkorderModal({
         (c.address || '').toLowerCase().includes(term) ||
       (c.phone || '').includes(formData.client || '')
   )
-  }, [invoiceOnly, apiClients, formData.client])
+  }, [apiBackedDocument, apiClients, formData.client])
 
   useEffect(() => {
-    if (!isOpen || !invoiceOnly) return
+    if (!isOpen || !apiBackedDocument) return
     let cancelled = false
     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
     setClientsLoading(true)
@@ -255,10 +256,10 @@ export default function AddWorkorderModal({
     return () => {
       cancelled = true
     }
-  }, [isOpen, invoiceOnly])
+  }, [isOpen, apiBackedDocument])
 
   useEffect(() => {
-    if (!isOpen || !invoiceOnly) return
+    if (!isOpen || !apiBackedDocument) return
     let cancelled = false
     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
     setPriceListLoading(true)
@@ -284,10 +285,10 @@ export default function AddWorkorderModal({
     return () => {
       cancelled = true
     }
-  }, [isOpen, invoiceOnly])
+  }, [isOpen, apiBackedDocument])
 
   useEffect(() => {
-    if (!isOpen || !invoiceOnly || initialClientId == null || initialClientId === '') return
+    if (!isOpen || !apiBackedDocument || initialClientId == null || initialClientId === '') return
     const c = apiClients.find((x) => String(x.id) === String(initialClientId))
     if (c) {
       setFormData((prev) => ({
@@ -297,7 +298,7 @@ export default function AddWorkorderModal({
         address: c.address || prev.address,
       }))
     }
-  }, [isOpen, invoiceOnly, initialClientId, apiClients])
+  }, [isOpen, apiBackedDocument, initialClientId, apiClients])
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return
@@ -345,7 +346,7 @@ export default function AddWorkorderModal({
 
   useEffect(() => {
     if (!isOpen) return
-    if (invoiceOnly) {
+    if (apiBackedDocument) {
       setFormData({
         ...defaultFormState(),
         startDate: initialDate ? format(initialDate, 'MMM d, yyyy') : format(new Date(), 'MMM d, yyyy'),
@@ -390,7 +391,7 @@ export default function AddWorkorderModal({
         : '04:15 AM',
       }))
       setAnytime(!initialTime)
-  }, [isOpen, initialDate, initialTime, initialClientId, invoiceOnly])
+  }, [isOpen, initialDate, initialTime, initialClientId, apiBackedDocument])
 
   useEffect(() => {
     if (!isOpen || !taskOnly) return
@@ -427,55 +428,64 @@ export default function AddWorkorderModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (quoteOnly) {
-      const clientMatch = mockClients.find(c => c.name === formData.client)
-      const clientId = clientMatch?.id ?? 1
-      const clientName = formData.client || (clientMatch?.name ?? '')
-      const lineItems = formData.lineItems.map(item => ({
-        name: item.name,
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice ?? 0,
-        unitCost: 0,
-        total: (item.quantity || 1) * (item.unitPrice ?? 0),
-      }))
-      const subtotal = lineItems.reduce((sum, i) => sum + i.total, 0)
-      const newId = mockWorkorders.length > 0 ? Math.max(...mockWorkorders.map((w: { id: number }) => w.id)) + 1 : 1
-      const newWo = {
-        id: newId,
-        title: formData.title || 'Quote',
-        clientId,
-        clientName,
-        address: formData.address || '',
-        schedule: { day: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00' },
-        assignedTeamMember: '',
-        instructions: '',
-        lineItems,
-        subtotal,
-        discount: 0,
-        discountType: 'amount' as const,
-        tax: 0,
-        total: subtotal,
-        cost: 0,
-        estimateMargin: subtotal,
-        expenses: [],
-        notes: '',
-        quoteStatus: 'not sent' as const,
-        quoteNumber: '',
-        quoteDateSent: '',
-        quoteWhatsappStatus: '',
-        quoteRequired: true,
-        invoiceStatus: 'not sent' as const,
-        invoiceNumber: '',
-        invoiceDateSent: '',
-        invoiceWhatsappStatus: '',
-        jobStatus: 'Scheduled' as const,
-        payments: [],
-        createdAt: format(new Date(), 'yyyy-MM-dd'),
-        lastModified: format(new Date(), 'yyyy-MM-dd'),
+      const titleTrim = (formData.title || '').trim()
+      const addressTrim = (formData.address || '').trim()
+      if (formData.clientId == null || formData.clientId === '') {
+        alert('Please select a client from the list.')
+        return
       }
-      mockWorkorders.push(newWo as never)
-      alert('Quote saved. Work order created.')
-      onClose()
-      setFormData(defaultFormState())
+      if (!addressTrim) {
+        alert('Address is required.')
+        return
+      }
+      if (!titleTrim) {
+        alert('Title is required.')
+        return
+      }
+      setDocumentSubmitting(true)
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
+        const body: Record<string, unknown> = {
+          clientId: formData.clientId,
+          title: titleTrim,
+          address: addressTrim,
+          quoteRequired: true,
+        }
+        const instructionsTrim = (formData.instructions || '').trim()
+        if (instructionsTrim) body.instructions = instructionsTrim
+        if (formData.lineItems.length > 0) {
+          body.lineItems = formData.lineItems.map((item) => ({
+            name: (item.name || '').trim() || '—',
+            itemType: 'SERVICE' as const,
+            description: (item.description || '').trim() || null,
+            quantity: Number(item.quantity) || 0,
+            price: Number(item.unitPrice) || 0,
+            cost: 0,
+          }))
+        }
+        const res = await fetch(`${baseUrl}/api/quotes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || (data as { success?: boolean }).success === false) {
+          const msg =
+            (data as { message?: string }).message ??
+            (data as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+            `Failed to create quote (${res.status})`
+          alert(msg)
+          return
+        }
+        alert('Quote created successfully.')
+        onClose()
+        setFormData(defaultFormState())
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to create quote')
+      } finally {
+        setDocumentSubmitting(false)
+      }
       return
     }
     if (invoiceOnly) {
@@ -493,7 +503,7 @@ export default function AddWorkorderModal({
         alert('Title is required.')
         return
       }
-      setInvoiceSubmitting(true)
+      setDocumentSubmitting(true)
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
         const body: Record<string, unknown> = {
@@ -532,7 +542,7 @@ export default function AddWorkorderModal({
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Failed to create invoice')
       } finally {
-        setInvoiceSubmitting(false)
+        setDocumentSubmitting(false)
       }
       return
     }
@@ -621,14 +631,14 @@ export default function AddWorkorderModal({
               setIsClientDropdownOpen={setIsClientDropdownOpen}
               clientDropdownRef={clientDropdownRef}
               filteredClients={filteredClientsForModal}
-              onOpenAddClient={invoiceOnly ? () => router.push('/clients') : () => setIsAddClientOpen(true)}
-              clientSearchVariant={invoiceOnly ? 'invoice' : 'default'}
-              clientsLoading={invoiceOnly && clientsLoading}
+              onOpenAddClient={apiBackedDocument ? () => router.push('/clients') : () => setIsAddClientOpen(true)}
+              clientSearchVariant={apiBackedDocument ? 'invoice' : 'default'}
+              clientsLoading={apiBackedDocument && clientsLoading}
             />
 
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
-                {invoiceOnly ? (
+                {apiBackedDocument ? (
                   <>
                     Address <span className="text-red-500">*</span>
                   </>
@@ -637,8 +647,8 @@ export default function AddWorkorderModal({
                 )}
               </label>
               <p className="text-[10px] mb-0.5" style={{ color: '#1F271B', opacity: 0.6 }}>
-                {invoiceOnly
-                  ? 'Required. Prefilled when you select a client; you can edit it for this invoice.'
+                {apiBackedDocument
+                  ? 'Required. Prefilled when you select a client; you can edit it if needed.'
                   : 'Fetched from last registered workorder or task of selected client'}
               </p>
               <input
@@ -654,7 +664,7 @@ export default function AddWorkorderModal({
 
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: '#1F271B' }}>
-                {invoiceOnly ? (
+                {apiBackedDocument ? (
                   <>
                     Title <span className="text-red-500">*</span>
                   </>
@@ -714,9 +724,9 @@ export default function AddWorkorderModal({
               addLineItemProducts={addLineItemProducts}
               addLineItemFiltered={addLineItemFiltered}
               onAddLineItemSelect={addLineItemSelect}
-              lineItemsSectionLabel={invoiceOnly ? 'Line items (Optional)' : null}
-              onNavigateCreatePriceItem={invoiceOnly ? () => router.push('/settings?section=products') : undefined}
-              priceListLoading={invoiceOnly && priceListLoading}
+              lineItemsSectionLabel={apiBackedDocument ? 'Line items (Optional)' : null}
+              onNavigateCreatePriceItem={apiBackedDocument ? () => router.push('/settings?section=products') : undefined}
+              priceListLoading={apiBackedDocument && priceListLoading}
             />
 
             <AddWorkorderModalScheduleSection
@@ -748,7 +758,7 @@ export default function AddWorkorderModal({
               onClose={onClose}
               formData={formData}
               anytime={anytime}
-              isSubmitting={invoiceOnly && invoiceSubmitting}
+              isSubmitting={documentSubmitting}
             />
           </form>
         </div>
