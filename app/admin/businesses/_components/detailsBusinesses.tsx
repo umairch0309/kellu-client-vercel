@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -9,16 +10,23 @@ import {
   Briefcase,
   DollarSign,
   Clock,
-  UserCheck,
   Ban,
+  UserCheck,
   Activity,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type BusinessDetail = {
   id: string;
   companyName: string;
   email: string;
-  status: "active" | "inactive" | "suspended";
+  status: string;
   totalJobs: number;
   revenue: number;
   usersCount: number;
@@ -29,78 +37,75 @@ type BusinessDetail = {
   industry: string;
 };
 
-const mockBusinesses: Record<string, BusinessDetail> = {
-  "1": {
-    id: "1",
-    companyName: "ABC Corporation",
-    email: "contact@abccorp.com",
-    status: "active",
-    totalJobs: 142,
-    revenue: 45800,
-    usersCount: 12,
-    lastLogin: "2 hours ago",
-    phone: "+1 (555) 123-4567",
-    address: "123 Business Ave, New York, NY 10001",
-    joinedDate: "January 15, 2023",
-    industry: "Technology",
-  },
-  "2": {
-    id: "2",
-    companyName: "TechStart Solutions",
-    email: "hello@techstart.io",
-    status: "active",
-    totalJobs: 89,
-    revenue: 32400,
-    usersCount: 8,
-    lastLogin: "1 day ago",
-    phone: "+1 (555) 234-5678",
-    address: "456 Innovation Blvd, San Francisco, CA 94105",
-    joinedDate: "March 8, 2023",
-    industry: "Software",
-  },
-  "3": {
-    id: "3",
-    companyName: "Global Industries Ltd",
-    email: "info@globalind.com",
-    status: "suspended",
-    totalJobs: 234,
-    revenue: 78900,
-    usersCount: 25,
-    lastLogin: "2 weeks ago",
-    phone: "+1 (555) 345-6789",
-    address: "789 Corporate Dr, Chicago, IL 60601",
-    joinedDate: "September 21, 2022",
-    industry: "Manufacturing",
-  },
-  "4": {
-    id: "4",
-    companyName: "BuildRight Construction",
-    email: "admin@buildright.com",
-    status: "active",
-    totalJobs: 167,
-    revenue: 54200,
-    usersCount: 15,
-    lastLogin: "5 hours ago",
-    phone: "+1 (555) 456-7890",
-    address: "321 Builder St, Dallas, TX 75201",
-    joinedDate: "June 3, 2023",
-    industry: "Construction",
-  },
-  "5": {
-    id: "5",
-    companyName: "Creative Design Studio",
-    email: "studio@creative.design",
-    status: "inactive",
-    totalJobs: 45,
-    revenue: 12300,
-    usersCount: 5,
-    lastLogin: "3 months ago",
-    phone: "+1 (555) 567-8901",
-    address: "654 Art Lane, Los Angeles, CA 90001",
-    joinedDate: "November 12, 2023",
-    industry: "Design",
-  },
-};
+function extractBusinessesList(json: unknown): unknown[] {
+  if (json == null || typeof json !== "object") return [];
+  const obj = json as Record<string, unknown>;
+  const data = obj.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const nested = (data as Record<string, unknown>).data;
+    if (Array.isArray(nested)) return nested;
+  }
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function asNumber(v: unknown): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  if (typeof v === "string") {
+    const parsed = parseFloat(v);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+function asDateDisplay(value: unknown): string {
+  if (value == null) return "—";
+  const raw = String(value).trim();
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleString();
+}
+
+function normalizeBusinessDetail(raw: Record<string, unknown>): BusinessDetail {
+  const owner = (raw.owner ?? {}) as Record<string, unknown>;
+  const contactInfo = (raw.contactInfo ?? {}) as Record<string, unknown>;
+  const companyName =
+    typeof raw.companyName === "string" && raw.companyName.trim() !== ""
+      ? raw.companyName
+      : "—";
+  const email =
+    typeof raw.email === "string" && raw.email.trim() !== ""
+      ? raw.email
+      : typeof owner.email === "string"
+      ? owner.email
+      : "—";
+  const phone =
+    (typeof raw.phone === "string" && raw.phone) ||
+    (typeof contactInfo.phone === "string" && contactInfo.phone) ||
+    (typeof owner.phone === "string" && owner.phone) ||
+    "—";
+  const address =
+    (typeof raw.address === "string" && raw.address) ||
+    (typeof contactInfo.address === "string" && contactInfo.address) ||
+    (typeof owner.address === "string" && owner.address) ||
+    "—";
+  const registered = raw.registered;
+  return {
+    id: String(raw.id ?? ""),
+    companyName,
+    email,
+    status: String(raw.status ?? "inactive").toLowerCase(),
+    totalJobs: Math.trunc(asNumber(raw.totalJobs)),
+    revenue: asNumber(raw.revenue),
+    usersCount: Math.trunc(asNumber(raw.users)),
+    lastLogin: asDateDisplay(raw.lastLogin),
+    phone,
+    address,
+    joinedDate: asDateDisplay(registered),
+    industry: "Business",
+  };
+}
 
 const statusStyle = (status: string) => {
   if (status === "active") return "bg-[rgba(40,175,176,0.2)] text-[#1E8A8B]";
@@ -112,8 +117,220 @@ export default function BusinessDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const [businesses, setBusinesses] = useState<BusinessDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [reminderSending, setReminderSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailForm, setEmailForm] = useState({
+    subject: "",
+    body: "",
+    message: "",
+  });
 
-  const business = mockBusinesses[id];
+  useEffect(() => {
+    let cancelled = false;
+    const fetchBusinesses = async () => {
+      setLoading(true);
+      setFetchError(null);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+        const res = await fetch(`${baseUrl}/api/businesses`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || (json as { success?: boolean }).success === false) {
+          const msg =
+            (json as { message?: string }).message ??
+            `Failed to load businesses (${res.status})`;
+          throw new Error(msg);
+        }
+        const rows = extractBusinessesList(json)
+          .filter(
+            (item): item is Record<string, unknown> =>
+              item != null && typeof item === "object" && !Array.isArray(item)
+          )
+          .map((item) => normalizeBusinessDetail(item));
+        if (!cancelled) setBusinesses(rows);
+      } catch (e) {
+        if (!cancelled) {
+          setFetchError(
+            e instanceof Error ? e.message : "Failed to load businesses"
+          );
+          setBusinesses([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void fetchBusinesses();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const business = useMemo(
+    () => businesses.find((item) => item.id === id),
+    [businesses, id]
+  );
+
+  const handleToggleSuspend = async () => {
+    if (!business || !business.id || statusUpdating) return;
+    setStatusUpdating(true);
+    try {
+      const isSuspended = business.status === "suspended";
+      const actionPath = isSuspended ? "unsuspend" : "suspend";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(
+        `${baseUrl}/api/businesses/${encodeURIComponent(business.id)}/${actionPath}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to ${actionPath} business (${res.status})`;
+        alert(msg);
+        return;
+      }
+      const nextStatus =
+        typeof (json as { data?: { status?: unknown } }).data?.status === "string"
+          ? String((json as { data?: { status?: string } }).data?.status).toLowerCase()
+          : isSuspended
+          ? "active"
+          : "suspended";
+      setBusinesses((prev) =>
+        prev.map((item) =>
+          item.id === business.id ? { ...item, status: nextStatus } : item
+        )
+      );
+      alert(
+        (json as { message?: string }).message ??
+          (isSuspended
+            ? "Business unsuspended successfully."
+            : "Business suspended successfully.")
+      );
+    } catch (e) {
+      alert(
+        e instanceof Error
+          ? e.message
+          : "Failed to update business status"
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const resetEmailForm = () => {
+    setEmailForm({ subject: "", body: "", message: "" });
+    setEmailError(null);
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!business?.id) return;
+    const subject = emailForm.subject.trim();
+    if (!subject) {
+      setEmailError("Subject is required.");
+      return;
+    }
+    setEmailSending(true);
+    setEmailError(null);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const payload: Record<string, string> = { subject };
+      if (emailForm.body.trim()) payload.body = emailForm.body.trim();
+      if (emailForm.message.trim()) payload.message = emailForm.message.trim();
+      const res = await fetch(
+        `${baseUrl}/api/businesses/${encodeURIComponent(business.id)}/send-email`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { data?: { message?: string } }).data?.message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to send email (${res.status})`;
+        setEmailError(msg);
+        return;
+      }
+      alert(
+        (json as { data?: { message?: string } }).data?.message ??
+          (json as { message?: string }).message ??
+          "Email sent successfully."
+      );
+      setEmailDialogOpen(false);
+      resetEmailForm();
+    } catch (e2) {
+      setEmailError(e2 instanceof Error ? e2.message : "Failed to send email");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!business?.id || reminderSending) return;
+    setReminderSending(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(
+        `${baseUrl}/api/businesses/${encodeURIComponent(business.id)}/reminder`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { data?: { message?: string } }).data?.message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to send reminder (${res.status})`;
+        alert(msg);
+        return;
+      }
+      alert(
+        (json as { data?: { message?: string } }).data?.message ??
+          (json as { message?: string }).message ??
+          "Reminder sent successfully."
+      );
+    } catch (e) {
+      alert(
+        e instanceof Error ? e.message : "Failed to send reminder"
+      );
+    } finally {
+      setReminderSending(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Building2 size={48} className="text-neutral-dark/30" />
+        <h2 className="text-xl font-semibold text-neutral-dark">Loading business...</h2>
+      </div>
+    );
+  }
 
   if (!business) {
     return (
@@ -122,6 +339,9 @@ export default function BusinessDetailPage() {
         <h2 className="text-xl font-semibold text-neutral-dark">
           Business not found
         </h2>
+        {fetchError ? (
+          <p className="text-sm text-red-600">{fetchError}</p>
+        ) : null}
         <p className="text-sm text-neutral-dark/60">
           No business exists with ID: {id}
         </p>
@@ -205,16 +425,37 @@ export default function BusinessDetailPage() {
                 {business.status}
               </span>
               <button
-                className="p-2 rounded-lg hover:bg-neutral-light transition-colors"
-                title="Approve"
+                type="button"
+                onClick={() => {
+                  resetEmailForm();
+                  setEmailDialogOpen(true);
+                }}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors text-white disabled:opacity-60"
+                style={{ backgroundColor: "#28AFB0" }}
               >
-                <UserCheck size={16} style={{ color: "#1F271B" }} />
+                Send email
               </button>
               <button
-                className="p-2 rounded-lg hover:bg-neutral-light transition-colors"
-                title="Suspend"
+                type="button"
+                onClick={handleSendReminder}
+                disabled={reminderSending}
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors text-white disabled:opacity-60"
+                style={{ backgroundColor: "#28AFB0" }}
               >
-                <Ban size={16} style={{ color: "#EF4444" }} />
+                {reminderSending ? "Sending..." : "Reminder"}
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleSuspend}
+                disabled={statusUpdating}
+                className="p-2 rounded-lg hover:bg-neutral-light transition-colors"
+                title={business.status === "suspended" ? "Unsuspend" : "Suspend"}
+              >
+                {business.status === "suspended" ? (
+                  <UserCheck size={16} style={{ color: "#1E8A8B" }} />
+                ) : (
+                  <Ban size={16} style={{ color: "#EF4444" }} />
+                )}
               </button>
             </div>
           </div>
@@ -326,6 +567,95 @@ export default function BusinessDetailPage() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={emailDialogOpen}
+        onOpenChange={(open) => {
+          setEmailDialogOpen(open);
+          if (!open) resetEmailForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Send email to business</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSendEmail} className="space-y-3">
+            {emailError && (
+              <div
+                className="rounded border px-3 py-2 text-xs"
+                style={{
+                  borderColor: "#FCA5A5",
+                  color: "#B91C1C",
+                  backgroundColor: "#FEF2F2",
+                }}
+              >
+                {emailError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "#1F271B" }}>
+                Subject *
+              </label>
+              <input
+                type="text"
+                required
+                value={emailForm.subject}
+                onChange={(e) =>
+                  setEmailForm((prev) => ({ ...prev, subject: e.target.value }))
+                }
+                className="w-full px-3 py-2 border rounded text-sm"
+                style={{ borderColor: "#EAEBED", color: "#1F271B" }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "#1F271B" }}>
+                Body
+              </label>
+              <textarea
+                rows={3}
+                value={emailForm.body}
+                onChange={(e) =>
+                  setEmailForm((prev) => ({ ...prev, body: e.target.value }))
+                }
+                className="w-full px-3 py-2 border rounded text-sm resize-none"
+                style={{ borderColor: "#EAEBED", color: "#1F271B" }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "#1F271B" }}>
+                Message
+              </label>
+              <textarea
+                rows={3}
+                value={emailForm.message}
+                onChange={(e) =>
+                  setEmailForm((prev) => ({ ...prev, message: e.target.value }))
+                }
+                className="w-full px-3 py-2 border rounded text-sm resize-none"
+                style={{ borderColor: "#EAEBED", color: "#1F271B" }}
+              />
+            </div>
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={() => setEmailDialogOpen(false)}
+                className="px-3 py-2 border rounded text-sm"
+                style={{ borderColor: "#EAEBED", color: "#1F271B" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={emailSending}
+                className="px-3 py-2 rounded text-sm text-white disabled:opacity-60"
+                style={{ backgroundColor: "#28AFB0" }}
+              >
+                {emailSending ? "Sending..." : "Send email"}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

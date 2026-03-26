@@ -1,94 +1,101 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Eye, UserCheck, Ban, Building2 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-type BusinessItem = {
-  id: string;
-  companyName: string;
-  email: string;
-  status: "active" | "inactive" | "suspended";
-  totalJobs: number;
-  revenue: number;
-  usersCount: number;
-  lastLogin: string;
-};
-
-const initialMockBusinesses: BusinessItem[] = [
-  {
-    id: "1",
-    companyName: "ABC Corporation",
-    email: "contact@abccorp.com",
-    status: "active",
-    totalJobs: 142,
-    revenue: 45800,
-    usersCount: 12,
-    lastLogin: "2 hours ago",
-  },
-  {
-    id: "2",
-    companyName: "TechStart Solutions",
-    email: "hello@techstart.io",
-    status: "active",
-    totalJobs: 89,
-    revenue: 32400,
-    usersCount: 8,
-    lastLogin: "1 day ago",
-  },
-  {
-    id: "3",
-    companyName: "Global Industries Ltd",
-    email: "info@globalind.com",
-    status: "suspended",
-    totalJobs: 234,
-    revenue: 78900,
-    usersCount: 25,
-    lastLogin: "2 weeks ago",
-  },
-  {
-    id: "4",
-    companyName: "BuildRight Construction",
-    email: "admin@buildright.com",
-    status: "active",
-    totalJobs: 167,
-    revenue: 54200,
-    usersCount: 15,
-    lastLogin: "5 hours ago",
-  },
-  {
-    id: "5",
-    companyName: "Creative Design Studio",
-    email: "studio@creative.design",
-    status: "inactive",
-    totalJobs: 45,
-    revenue: 12300,
-    usersCount: 5,
-    lastLogin: "3 months ago",
-  },
-];
+import AdminBusinessesHeader from "./AdminBusinessesHeader";
+import AdminBusinessesFilters from "./AdminBusinessesFilters";
+import AdminBusinessesTable from "./AdminBusinessesTable";
+import { CreateBusinessDialog, UpdateBusinessDialog } from "./BusinessDialogs";
+import { extractBusinessesList, normalizeBusiness, normalizeWebsite } from "./businessesApi";
+import type { BusinessItem, CreateBusinessForm, UpdateBusinessForm } from "./businessesTypes";
 
 export default function AdminBusinessesList() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [businesses] = useState(initialMockBusinesses);
-  const filteredBusinesses = businesses.filter((business) => {
-    const matchesSearch =
-      business.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      business.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || business.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+  const [businesses, setBusinesses] = useState<BusinessItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState<Set<string>>(new Set());
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [editingBusinessId, setEditingBusinessId] = useState<string>("");
+  const [createForm, setCreateForm] = useState<CreateBusinessForm>({
+    companyName: "",
+    email: "",
+    phone: "",
+    address: "",
+    website: "",
+    tempPassword: "",
+    status: true,
   });
+  const [updateForm, setUpdateForm] = useState<UpdateBusinessForm>({
+    companyName: "",
+    email: "",
+    phone: "",
+    address: "",
+    website: "",
+    status: true,
+  });
+
+  const fetchBusinesses = useCallback(async () => {
+    let cancelled = false;
+    try {
+      setLoading(true);
+      setFetchError(null);
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${baseUrl}/api/businesses`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          `Failed to load businesses (${res.status})`;
+        throw new Error(msg);
+      }
+      const rows = extractBusinessesList(json)
+        .filter(
+          (item): item is Record<string, unknown> =>
+            item != null && typeof item === "object" && !Array.isArray(item)
+        )
+        .map((item) => normalizeBusiness(item));
+      if (!cancelled) setBusinesses(rows);
+    } catch (e) {
+      if (!cancelled) {
+        setFetchError(
+          e instanceof Error ? e.message : "Failed to load businesses"
+        );
+        setBusinesses([]);
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void fetchBusinesses();
+  }, [fetchBusinesses]);
+
+  const filteredBusinesses = useMemo(() => {
+    return businesses.filter((business) => {
+      const matchesSearch =
+        business.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        business.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus =
+        statusFilter === "all" || business.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [businesses, searchTerm, statusFilter]);
 
   const statusStyle = (status: string) => {
     if (status === "active") return "bg-[rgba(40,175,176,0.2)] text-[#1E8A8B]";
@@ -96,211 +103,241 @@ export default function AdminBusinessesList() {
     return "bg-[rgba(239,68,68,0.2)] text-red-600";
   };
 
+  const resetCreateForm = () => {
+    setCreateForm({
+      companyName: "",
+      email: "",
+      phone: "",
+      address: "",
+      website: "",
+      tempPassword: "",
+      status: true,
+    });
+    setCreateError(null);
+  };
+
+  const resetUpdateForm = () => {
+    setUpdateForm({
+      companyName: "",
+      email: "",
+      phone: "",
+      address: "",
+      website: "",
+      status: true,
+    });
+    setEditingBusinessId("");
+    setUpdateError(null);
+  };
+
+  const handleCreateBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+    if (!createForm.companyName.trim() || !createForm.email.trim() || !createForm.phone.trim() || !createForm.tempPassword.trim()) {
+      setCreateError("Company name, email, phone and temp password are required.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const normalizedWebsite = normalizeWebsite(createForm.website);
+      if (normalizedWebsite === null) {
+        setCreateError("Website must be a valid URL.");
+        setCreating(false);
+        return;
+      }
+      const body: Record<string, unknown> = {
+        companyName: createForm.companyName.trim(),
+        email: createForm.email.trim(),
+        phone: createForm.phone.trim(),
+        tempPassword: createForm.tempPassword.trim(),
+        status: createForm.status,
+      };
+      if (createForm.address.trim()) body.address = createForm.address.trim();
+      if (normalizedWebsite) body.website = normalizedWebsite;
+
+      const res = await fetch(`${baseUrl}/api/businesses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to create business (${res.status})`;
+        setCreateError(msg);
+        return;
+      }
+      setIsCreateOpen(false);
+      resetCreateForm();
+      await fetchBusinesses();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create business");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const openUpdateBusiness = (business: BusinessItem) => {
+    setEditingBusinessId(business.id);
+    setUpdateForm({
+      companyName: business.companyName === "—" ? "" : business.companyName,
+      email: business.email === "—" ? "" : business.email,
+      phone: business.phone,
+      address: business.address,
+      website: business.website,
+      status: business.status === "active",
+    });
+    setUpdateError(null);
+    setIsUpdateOpen(true);
+  };
+
+  const handleUpdateBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdateError(null);
+    if (!editingBusinessId) return;
+    if (!updateForm.companyName.trim() || !updateForm.email.trim() || !updateForm.phone.trim()) {
+      setUpdateError("Company name, email and phone are required.");
+      return;
+    }
+    setUpdating(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const normalizedWebsite = normalizeWebsite(updateForm.website);
+      if (normalizedWebsite === null) {
+        setUpdateError("Website must be a valid URL.");
+        setUpdating(false);
+        return;
+      }
+      const body: Record<string, unknown> = {
+        companyName: updateForm.companyName.trim(),
+        email: updateForm.email.trim(),
+        phone: updateForm.phone.trim(),
+        status: updateForm.status,
+      };
+      if (updateForm.address.trim()) body.address = updateForm.address.trim();
+      if (normalizedWebsite) body.website = normalizedWebsite;
+
+      const res = await fetch(`${baseUrl}/api/businesses/${encodeURIComponent(editingBusinessId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to update business (${res.status})`;
+        setUpdateError(msg);
+        return;
+      }
+      setIsUpdateOpen(false);
+      resetUpdateForm();
+      await fetchBusinesses();
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "Failed to update business");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleToggleStatus = async (business: BusinessItem) => {
+    const id = String(business.id).trim();
+    if (!id || statusUpdatingIds.has(id)) return;
+    const nextStatus = business.status === "active" ? "inactive" : "active";
+    const nextStatusBoolean = nextStatus === "active";
+    setStatusUpdatingIds((prev) => new Set(prev).add(id));
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${baseUrl}/api/businesses/${encodeURIComponent(id)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: nextStatusBoolean }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || (json as { success?: boolean }).success === false) {
+        const msg =
+          (json as { message?: string }).message ??
+          (json as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          `Failed to update status (${res.status})`;
+        alert(msg);
+        return;
+      }
+      const apiStatus =
+        typeof (json as { data?: { status?: unknown } }).data?.status === "string"
+          ? String((json as { data?: { status?: string } }).data?.status).toLowerCase()
+          : nextStatus;
+      setBusinesses((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, status: apiStatus } : item))
+      );
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to update status");
+    } finally {
+      setStatusUpdatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-neutral-dark">
-          Businesses
-        </h1>
-      </div>
+      <AdminBusinessesHeader
+        onCreate={() => {
+          resetCreateForm();
+          setIsCreateOpen(true);
+        }}
+      />
 
-      {/* Businesses List */}
       <div className="bg-white rounded-lg shadow-sm border border-neutral-light overflow-hidden">
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 p-3 border-b border-neutral-light">
-          <h2 className="text-base font-bold" style={{ color: "#1F271B" }}>
-            All businesses ({filteredBusinesses.length} result
-            {filteredBusinesses.length !== 1 ? "s" : ""})
-          </h2>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 sm:flex-initial justify-end">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 border rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
-              style={{
-                borderColor: "#EAEBED",
-                color: "#1F271B",
-                backgroundColor: "#F3F4F6",
-              }}
-            >
-              <option value="all">Status | All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
-            </select>
-            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]">
-              <Search
-                className="absolute left-2.5 top-1/2 transform -translate-y-1/2"
-                size={14}
-                style={{ color: "#1F271B", opacity: 0.5 }}
-              />
-              <input
-                type="text"
-                placeholder="Search businesses..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
-                style={{ borderColor: "#EAEBED", color: "#1F271B" }}
-              />
-            </div>
-          </div>
-        </div>
+        <AdminBusinessesFilters
+          resultCount={filteredBusinesses.length}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+        />
 
-        {/* Mobile Cards */}
-        <div className="md:hidden divide-y divide-neutral-light">
-          {filteredBusinesses.map((business) => (
-            <div
-              key={business.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => router.push(`/admin/businesses/${business.id}`)}
-              className="p-4 hover:bg-neutral-light/50 cursor-pointer active:bg-neutral-light/70"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-dark">
-                    {business.companyName}
-                  </p>
-                  <p className="text-xs text-neutral-dark/70 mt-0.5">
-                    {business.email}
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ml-2 shrink-0 flex items-center gap-1 ${statusStyle(business.status)}`}
-                >
-                  <Building2 size={14} />
-                  {business.status}
-                </span>
-              </div>
-              <div className="space-y-1 mt-2">
-                <p className="text-xs text-neutral-dark/70">
-                  Jobs: {business.totalJobs}
-                </p>
-                <p className="text-xs text-neutral-dark/70">
-                  Users: {business.usersCount}
-                </p>
-                <p className="text-xs text-neutral-dark/70">
-                  Last Login: {business.lastLogin}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <TooltipProvider>
-            <table className="w-full">
-              <thead className="bg-neutral-light">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                    Company Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                    Total Jobs
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                    Revenue
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                    Users
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-dark">
-                    Last Login
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-neutral-dark">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBusinesses.map((business) => (
-                  <tr
-                    key={business.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() =>
-                      router.push(`/admin/businesses/${business.id}`)
-                    }
-                    className="border-b border-neutral-light hover:bg-neutral-light/50 cursor-pointer"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-neutral-dark">
-                      {business.companyName}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-dark/70">
-                      {business.email}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyle(
-                          business.status
-                        )}`}
-                      >
-                        {business.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                      {business.totalJobs}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                      ${business.revenue.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-neutral-dark">
-                      {business.usersCount}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-dark/70">
-                      {business.lastLogin}
-                    </td>
-                    <td
-                      className="px-4 py-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              href={`/admin/businesses/${business.id}`}
-                              className="p-2 rounded hover:bg-neutral-light"
-                            >
-                              <Eye size={16} />
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent className="text-blue-600 bg-blue-50">View Details</TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="p-2 rounded hover:bg-neutral-light">
-                              <UserCheck size={16} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="text-green-600 bg-green-50">Activate</TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="p-2 rounded hover:bg-neutral-light">
-                              <Ban size={16} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="text-red-600 bg-red-50">Suspend</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TooltipProvider>
-        </div>
+        <AdminBusinessesTable
+          loading={loading}
+          fetchError={fetchError}
+          businesses={filteredBusinesses}
+          statusStyle={statusStyle}
+          onRowClick={(id) => router.push(`/admin/businesses/${id}`)}
+          onToggleStatus={handleToggleStatus}
+          statusUpdatingIds={statusUpdatingIds}
+          onOpenUpdate={openUpdateBusiness}
+        />
       </div>
+
+      <CreateBusinessDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        form={createForm}
+        setForm={setCreateForm}
+        error={createError}
+        creating={creating}
+        onSubmit={handleCreateBusiness}
+      />
+
+      <UpdateBusinessDialog
+        open={isUpdateOpen}
+        onOpenChange={(open) => {
+          setIsUpdateOpen(open);
+          if (!open) resetUpdateForm();
+        }}
+        form={updateForm}
+        setForm={setUpdateForm}
+        error={updateError}
+        updating={updating}
+        onSubmit={handleUpdateBusiness}
+      />
     </div>
   );
 }
